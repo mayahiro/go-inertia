@@ -22,6 +22,8 @@ const (
 	HeaderInertiaPartialExcept = "X-Inertia-Partial-Except"
 	// HeaderInertiaErrorBag carries the requested validation error bag name.
 	HeaderInertiaErrorBag = "X-Inertia-Error-Bag"
+	// HeaderInertiaExceptOnceProps carries once prop keys already loaded by the client.
+	HeaderInertiaExceptOnceProps = "X-Inertia-Except-Once-Props"
 )
 
 // IsInertiaRequest reports whether req is an Inertia request.
@@ -52,6 +54,11 @@ func PartialExcept(req *http.Request) []string {
 // ErrorBag returns the requested validation error bag name from req.
 func ErrorBag(req *http.Request) string {
 	return req.Header.Get(HeaderInertiaErrorBag)
+}
+
+// ExceptOnceProps returns once prop keys the client has already loaded.
+func ExceptOnceProps(req *http.Request) []string {
+	return splitHeaderList(req.Header.Get(HeaderInertiaExceptOnceProps))
 }
 
 func splitHeaderList(value string) []string {

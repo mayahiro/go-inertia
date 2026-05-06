@@ -13,6 +13,7 @@ func TestRequestHelpers(t *testing.T) {
 	req.Header.Set(HeaderInertiaPartialData, "users, filters")
 	req.Header.Set(HeaderInertiaPartialExcept, "stats")
 	req.Header.Set(HeaderInertiaErrorBag, "createUser")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "plans, roles")
 
 	if !IsInertiaRequest(req) {
 		t.Fatal("expected inertia request")
@@ -31,6 +32,9 @@ func TestRequestHelpers(t *testing.T) {
 	}
 	if ErrorBag(req) != "createUser" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))
+	}
+	if !reflect.DeepEqual(ExceptOnceProps(req), []string{"plans", "roles"}) {
+		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))
 	}
 }
 
@@ -54,6 +58,9 @@ func TestRequestHelpersDefaultValues(t *testing.T) {
 	}
 	if ErrorBag(req) != "" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))
+	}
+	if ExceptOnceProps(req) != nil {
+		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))
 	}
 }
 

@@ -28,7 +28,7 @@ type pageMetadata struct {
 	MatchPropsOn   []string
 	ScrollProps    map[string]any
 	DeferredProps  map[string][]string
-	OnceProps      map[string]OnceProp
+	OnceProps      map[string]OncePropMetadata
 }
 
 func newPageProps(component string) pageProps {
@@ -125,7 +125,7 @@ func (m *pageMetadata) merge(other pageMetadata) {
 
 	if len(other.OnceProps) > 0 {
 		if m.OnceProps == nil {
-			m.OnceProps = map[string]OnceProp{}
+			m.OnceProps = map[string]OncePropMetadata{}
 		}
 		for key, value := range other.OnceProps {
 			m.OnceProps[key] = value

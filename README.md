@@ -46,6 +46,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - single-process in-memory flash store
 - top-level partial reload filtering
 - deferred props
+- once props
 - Vite manifest and dev-server tag generation
 - default render options
 - Echo v5 adapter
@@ -257,6 +258,25 @@ props should load in a separate request group.
 "teams": inertia.Defer(loadTeams, "attributes")
 ```
 
+## Once Props
+
+Use `Once` for props that the client can reuse after the first response.
+
+```go
+err := renderer.Render(w, req, "Dashboard", inertia.Props{
+	"plans": inertia.Once(func(req *http.Request) (any, error) {
+		return BillingPlans(req.Context())
+	}),
+})
+```
+
+Use `As` to share a once key across prop names, `Fresh` to force a reload, and
+`Until` to send an expiration timestamp.
+
+```go
+"availableRoles": inertia.Once(loadRoles).As("roles")
+```
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
@@ -270,6 +290,7 @@ React + Vite + Echo example.
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
 - [Deferred props](docs/deferred-props.md)
+- [Once props](docs/once-props.md)
 
 ## Not Yet Covered by Public Helpers
 
@@ -277,7 +298,7 @@ The core page object can serialize Inertia's advanced prop metadata fields, but
 user-facing helpers are not available yet for these workflows.
 
 - server-side rendering
-- once props
+- combined deferred and once props
 - merge, prepend, and deep merge props
 - infinite scroll protocol features
 - history encryption

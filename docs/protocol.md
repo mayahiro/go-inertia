@@ -3,10 +3,9 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, shared props, flash data, validation errors, top-level partial
-reload filtering, and deferred props. The page object can also serialize
+reload filtering, deferred props, and once props. The page object can also serialize
 advanced prop metadata fields used by current Inertia clients, although public
-helpers for merge, once, and infinite scroll prop workflows are not available
-yet.
+helpers for merge and infinite scroll prop workflows are not available yet.
 
 ## HTML First Visits
 
@@ -52,8 +51,9 @@ It also has JSON fields for advanced prop metadata:
 - `deferredProps`
 - `onceProps`
 
-These metadata fields are present so deferred props and future once, merge, and
-infinite scroll helpers can use the protocol shape expected by Inertia clients.
+These metadata fields are present so deferred props, once props, and future
+merge and infinite scroll helpers can use the protocol shape expected by
+Inertia clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.
@@ -105,3 +105,29 @@ v0.1 supports top-level prop filtering only.
 
 When the client requests the deferred prop with a matching partial reload, the
 callback is evaluated and the resolved prop is included in `props`.
+
+## Once Props
+
+`Once` resolves the prop normally until the client reports that it already has
+the once key. The client reports loaded once keys with
+`X-Inertia-Except-Once-Props`.
+
+```json
+{
+  "component": "Dashboard",
+  "props": {
+    "errors": {},
+    "plans": []
+  },
+  "url": "/dashboard",
+  "onceProps": {
+    "plans": {
+      "prop": "plans"
+    }
+  }
+}
+```
+
+When a later Inertia request includes `X-Inertia-Except-Once-Props: plans`, the
+prop is omitted and the `onceProps` metadata remains in the page object. A
+matching partial reload still resolves the prop when it requests the prop.

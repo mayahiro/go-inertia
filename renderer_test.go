@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHTMLResponseIncludesSafePageJSON(t *testing.T) {
@@ -220,7 +221,7 @@ func TestPropResolverAddsPageMetadata(t *testing.T) {
 		result: propResult{
 			Value: []string{"basic"},
 			Metadata: pageMetadata{
-				OnceProps: map[string]OnceProp{
+				OnceProps: map[string]OncePropMetadata{
 					"plans": {Prop: "plans"},
 				},
 			},
@@ -524,6 +525,211 @@ func TestDeferredPropError(t *testing.T) {
 	})
 	if err == nil || err.Error() != "load failed" {
 		t.Fatalf("expected deferred error, got %v", err)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
+func TestOncePropResolvesAndAddsMetadata(t *testing.T) {
+	calls := 0
+	expiresAt := time.UnixMilli(4102444800000)
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"plans": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"basic"}, nil
+		}).Until(expiresAt),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("once prop should resolve: %d", calls)
+	}
+	if got := page.Props["plans"].([]any); len(got) != 1 || got[0] != "basic" {
+		t.Fatalf("unexpected once prop value: %#v", page.Props["plans"])
+	}
+	metadata := page.OnceProps["plans"]
+	if metadata.Prop != "plans" {
+		t.Fatalf("unexpected once metadata: %#v", page.OnceProps)
+	}
+	if metadata.ExpiresAt == nil || *metadata.ExpiresAt != expiresAt.UnixMilli() {
+		t.Fatalf("unexpected once expiration: %#v", metadata.ExpiresAt)
+	}
+}
+
+func TestOncePropIsOmittedWhenClientAlreadyLoadedIt(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "plans")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"plans": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"basic"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("loaded once prop should not resolve: %d", calls)
+	}
+	if _, ok := page.Props["plans"]; ok {
+		t.Fatalf("loaded once prop should be omitted: %#v", page.Props)
+	}
+	if got := page.OnceProps["plans"]; got.Prop != "plans" {
+		t.Fatalf("once metadata should remain when omitted: %#v", page.OnceProps)
+	}
+}
+
+func TestOncePropUsesCustomKey(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "roles")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"availableRoles": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"admin"}, nil
+		}).As("roles"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("loaded custom once prop should not resolve: %d", calls)
+	}
+	if _, ok := page.Props["availableRoles"]; ok {
+		t.Fatalf("loaded custom once prop should be omitted: %#v", page.Props)
+	}
+	if got := page.OnceProps["roles"]; got.Prop != "availableRoles" {
+		t.Fatalf("unexpected custom once metadata: %#v", page.OnceProps)
+	}
+}
+
+func TestOncePropFreshIgnoresLoadedHeader(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "plans")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"plans": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"basic"}, nil
+		}).Fresh(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("fresh once prop should resolve: %d", calls)
+	}
+	if _, ok := page.Props["plans"]; !ok {
+		t.Fatalf("fresh once prop should be included: %#v", page.Props)
+	}
+}
+
+func TestOncePropResolvesWhenRequestedByPartialReload(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "plans")
+	req.Header.Set(HeaderInertiaPartialComponent, "Plans/Index")
+	req.Header.Set(HeaderInertiaPartialData, "plans")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"plans": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"basic"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("requested once prop should resolve during partial reload: %d", calls)
+	}
+	if _, ok := page.Props["plans"]; !ok {
+		t.Fatalf("requested once prop should be included: %#v", page.Props)
+	}
+	if got := page.OnceProps["plans"]; got.Prop != "plans" {
+		t.Fatalf("once metadata should be included: %#v", page.OnceProps)
+	}
+}
+
+func TestOncePropIsSkippedWhenPartialReloadDoesNotRequestIt(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "plans")
+	req.Header.Set(HeaderInertiaPartialComponent, "Plans/Index")
+	req.Header.Set(HeaderInertiaPartialData, "users")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"users": []string{"alice"},
+		"plans": Once(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"basic"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("unrequested once prop should not resolve: %d", calls)
+	}
+	if _, ok := page.Props["plans"]; ok {
+		t.Fatalf("unrequested once prop should be omitted: %#v", page.Props)
+	}
+	if len(page.OnceProps) > 0 {
+		t.Fatalf("unrequested partial response should not include once metadata: %#v", page.OnceProps)
+	}
+}
+
+func TestOncePropError(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/plans", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Plans/Index", Props{
+		"plans": Once(func(req *http.Request) (any, error) {
+			return nil, errors.New("load once failed")
+		}),
+	})
+	if err == nil || err.Error() != "load once failed" {
+		t.Fatalf("expected once error, got %v", err)
 	}
 	if w.Body.Len() != 0 {
 		t.Fatalf("response should not be written: %s", w.Body.String())

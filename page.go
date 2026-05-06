@@ -34,11 +34,11 @@ type Page struct {
 	// DeferredProps groups deferred prop names by request group.
 	DeferredProps map[string][]string `json:"deferredProps,omitempty"`
 	// OnceProps contains once prop metadata keyed by once prop key.
-	OnceProps map[string]OnceProp `json:"onceProps,omitempty"`
+	OnceProps map[string]OncePropMetadata `json:"onceProps,omitempty"`
 }
 
-// OnceProp describes an Inertia once prop entry in the page object.
-type OnceProp struct {
+// OncePropMetadata describes an Inertia once prop entry in the page object.
+type OncePropMetadata struct {
 	// Prop is the page prop path reused by the client.
 	Prop string `json:"prop"`
 	// ExpiresAt is a Unix millisecond timestamp, or nil when the prop does not expire.
