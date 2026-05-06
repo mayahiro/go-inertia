@@ -11,13 +11,20 @@ It demonstrates:
 - React page components written in TSX
 - Vite dev-server mode
 - Vite production manifest mode
+- Vite tags configured through default render options
 - shared props
-- form submission with redirect
+- typed Go page props converted to `inertia.Props`
+- form submission with Inertia `useForm`
 - flash messages
-- validation errors flashed through a small in-memory example store
+- validation errors flashed through `NewMemoryFlashStore`
 
-The in-memory flash store is for demonstration only. Use a real session store in
-production applications.
+`NewMemoryFlashStore` is intended for local development and single-process
+examples. Production applications should implement `FlashStore` with a real
+session library.
+
+The Go module uses local `replace` directives for `go-inertia` and the Echo
+adapter, so the example runs against this checkout instead of a published
+module tag.
 
 ## Requirements
 

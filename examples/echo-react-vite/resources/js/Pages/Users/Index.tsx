@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/react'
+import { useForm, usePage } from '@inertiajs/react'
 import type { FormEvent } from 'react'
 import type { ExamplePageProps, User } from '../../types'
 import Layout from '../Layout'
@@ -7,13 +7,23 @@ type UsersIndexProps = {
   users: User[]
 }
 
+type UserForm = {
+  name: string
+  email: string
+}
+
 export default function UsersIndex({ users }: UsersIndexProps) {
-  const { errors, flash } = usePage<ExamplePageProps>().props
+  const { flash } = usePage<ExamplePageProps>().props
+  const form = useForm<UserForm>({
+    name: '',
+    email: '',
+  })
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    router.post('/users', new FormData(event.currentTarget))
-    event.currentTarget.reset()
+    form.post('/users', {
+      onSuccess: () => form.reset(),
+    })
   }
 
   return (
@@ -41,15 +51,26 @@ export default function UsersIndex({ users }: UsersIndexProps) {
           <form className="form" onSubmit={submit}>
             <label className="field">
               <span>Name</span>
-              <input className="input" name="name" />
-              {errors.name && <span className="error">{errors.name}</span>}
+              <input
+                className="input"
+                name="name"
+                value={form.data.name}
+                onChange={event => form.setData('name', event.target.value)}
+              />
+              {form.errors.name && <span className="error">{form.errors.name}</span>}
             </label>
             <label className="field">
               <span>Email</span>
-              <input className="input" name="email" type="email" />
-              {errors.email && <span className="error">{errors.email}</span>}
+              <input
+                className="input"
+                name="email"
+                type="email"
+                value={form.data.email}
+                onChange={event => form.setData('email', event.target.value)}
+              />
+              {form.errors.email && <span className="error">{form.errors.email}</span>}
             </label>
-            <button className="button" type="submit">Create</button>
+            <button className="button" type="submit" disabled={form.processing}>Create</button>
           </form>
         </div>
       </section>
