@@ -1,10 +1,14 @@
-import { useForm, usePage } from '@inertiajs/react'
+import { InfiniteScroll, useForm, usePage } from '@inertiajs/react'
 import type { FormEvent } from 'react'
 import type { ExamplePageProps, User } from '../../types'
 import Layout from '../Layout'
 
+type PaginatedUsers = {
+  data: User[]
+}
+
 type UsersIndexProps = {
-  users: User[]
+  users: PaginatedUsers
 }
 
 type UserForm = {
@@ -22,6 +26,8 @@ export default function UsersIndex({ users }: UsersIndexProps) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     form.post('/users', {
+      preserveState: 'errors',
+      reset: ['users'],
       onSuccess: () => form.reset(),
     })
   }
@@ -31,22 +37,30 @@ export default function UsersIndex({ users }: UsersIndexProps) {
       {flash?.success && <div className="flash">{flash.success}</div>}
       <section className="panel">
         <div className="panel-body">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(user => (
-                <tr key={user.id}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
+          <InfiniteScroll
+            data="users"
+            itemsElement="#users-table-body"
+            onlyNext
+            buffer={160}
+            loading={<div className="load-state">Loading more users...</div>}
+          >
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody id="users-table-body">
+                {users.data.map(user => (
+                  <tr key={user.id}>
+                    <td>{user.name}</td>
+                    <td>{user.email}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </InfiniteScroll>
 
           <form className="form" onSubmit={submit}>
             <label className="field">

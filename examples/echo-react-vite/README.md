@@ -14,9 +14,16 @@ It demonstrates:
 - Vite tags configured through default render options
 - shared props
 - typed Go page props converted to `inertia.Props`
+- infinite scroll props with the React `InfiniteScroll` component
 - form submission with Inertia `useForm`
 - flash messages
 - validation errors flashed through `NewMemoryFlashStore`
+
+The Users page intentionally sends `reset: ["users"]` after a successful create
+so the infinite scroll list is rebuilt and the newly created user appears on
+the first page. In a production page where a form sits beside a long loaded
+list, omit that `reset` option when the existing scroll state should remain in
+place, or update the current list with Inertia client-side prop helpers.
 
 `NewMemoryFlashStore` is intended for local development and single-process
 examples. Production or clustered applications should implement `FlashStore`

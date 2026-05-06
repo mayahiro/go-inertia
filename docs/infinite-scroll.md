@@ -123,6 +123,29 @@ removes merge metadata, and marks the scroll metadata as reset.
 }
 ```
 
+`go-inertia` does not reset an infinite scroll prop by itself after `POST`,
+`PUT`, `PATCH`, or `DELETE` requests. It only reacts to the protocol headers
+sent by the Inertia client. A scroll prop is reset when the client visit sends
+the prop name in the `reset` option.
+
+```tsx
+form.post("/users", {
+  reset: ["users"],
+  preserveState: "errors",
+})
+```
+
+Use this when a successful mutation should replace the loaded scroll data with
+fresh server data, such as returning to the first page after filters change or
+after creating an item that should appear at the top of the list.
+
+If a form lives on the same page as a long infinite scroll list and the user
+should stay on the currently loaded list, do not send `reset` for that prop.
+Inertia `post`, `put`, `patch`, and `delete` visits preserve component state by
+default. In that case, applications often keep the current scroll state and
+update the list with client-side prop helpers such as `router.prependToProp` or
+`router.appendToProp`, or reload only the data they need later.
+
 ## Client Usage
 
 Use the client adapter's `InfiniteScroll` component with the prop name.

@@ -85,6 +85,13 @@ a {
   text-align: left;
 }
 
+.load-state {
+  padding: 14px;
+  color: #5c667a;
+  font-size: 14px;
+  text-align: center;
+}
+
 .form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

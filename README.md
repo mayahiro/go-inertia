@@ -328,6 +328,11 @@ matched by an identifier.
 "feed": inertia.Scroll(feed, metadata).Wrapper("items").MatchOn("items.id")
 ```
 
+`Scroll` follows the Inertia protocol and does not reset loaded scroll data by
+itself after form submissions. Use the client `reset` visit option when a
+successful mutation should reload a scroll prop from the first page. Omit
+`reset` when the current loaded list should stay in place.
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
