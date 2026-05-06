@@ -5,8 +5,8 @@ manifest mode.
 
 ## Development Mode
 
-Set `DevServerURL` to generate tags that load Vite from the dev server. Enable
-`ReactRefresh` when using React.
+Set `DevServerURL` to generate tags that load assets from the Vite dev server.
+Enable `ReactRefresh` when using React.
 
 ```go
 vite, err := inertia.NewVite(inertia.ViteConfig{
@@ -51,6 +51,29 @@ renderer, err := inertia.New(inertia.Config{
 	VersionProvider: vite.VersionProvider(),
 })
 ```
+
+## Default Render Options
+
+Set `Tags` as a default render option when every page uses the same Vite
+entrypoint. This keeps `inertia.WithViteTags(tags)` out of individual handlers.
+
+```go
+tags, err := vite.Tags()
+if err != nil {
+	return err
+}
+
+renderer, err := inertia.New(inertia.Config{
+	RootView:        rootView,
+	VersionProvider: vite.VersionProvider(),
+	DefaultRenderOptions: []inertia.RenderOption{
+		inertia.WithViteTags(tags),
+	},
+})
+```
+
+When a request needs different tags, pass `inertia.WithViteTags(tags)` to
+`Render`. Per-call options are applied after default options.
 
 ## Deployment
 

@@ -1,13 +1,12 @@
 # Validation and Flash
 
-Inertia validation flows usually redirect back and flash validation errors
-instead of returning `422` JSON responses. On the next request, the client sees
-the validation errors in the `errors` prop.
+Inertia validation usually redirects back and flashes validation errors instead
+of returning `422` JSON responses. On the next request, the client reads those
+validation errors from the `errors` prop.
 
 ## FlashStore
 
-`go-inertia` provides the `FlashStore` interface but does not include a
-production session store.
+`go-inertia` provides the `FlashStore` interface.
 
 ```go
 type FlashStore interface {
@@ -17,8 +16,24 @@ type FlashStore interface {
 }
 ```
 
-Applications should implement `FlashStore` with their session library of
-choice.
+Production applications should implement `FlashStore` with their session
+library of choice.
+
+## MemoryFlashStore
+
+Use `NewMemoryFlashStore` for local development, tests, and single-process
+examples. It keeps flash data in process memory and stores only a session id in
+an HTTP-only cookie.
+
+```go
+renderer, err := inertia.New(inertia.Config{
+	RootView:   rootView,
+	FlashStore: inertia.NewMemoryFlashStore(),
+})
+```
+
+`NewMemoryFlashStore` is not durable storage. Use a different `FlashStore` for
+multi-process deployments, server restarts, or production session policies.
 
 ## Configure the Renderer
 
@@ -53,9 +68,15 @@ return renderer.Back(w, req, inertia.WithValidationErrors(inertia.ValidationErro
 
 Validation errors are sent in the `errors` prop on the next render.
 
+Inertia preserves component state after `post`, `put`, `patch`, and `delete`
+requests, so applications usually do not need to send old input back through
+server props. Use the Inertia form helpers on the React, Vue, or Svelte side to
+handle redirect errors and form state naturally.
+
 ## Error Bags
 
-Use `WithErrorBag` to store validation errors in a named error bag.
+Use `WithErrorBag` when multiple forms on the same page share field names and
+need separate validation error scopes.
 
 ```go
 return renderer.Back(w, req,

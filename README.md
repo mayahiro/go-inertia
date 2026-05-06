@@ -7,8 +7,8 @@ the Go standard library. Echo v5 support lives in a separate adapter module.
 
 ## Status
 
-This project is preparing its first public release. The current target is
-`v0.1.0`.
+This project is in the v0 release line. Check the Git tags for available
+versions.
 
 ## Package Layout
 
@@ -43,15 +43,18 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - Inertia redirects, back redirects, and external locations
 - shared props
 - flash data and validation error interfaces
+- single-process in-memory flash store
 - top-level partial reload filtering
 - Vite manifest and dev-server tag generation
+- default render options
 - Echo v5 adapter
 
 ## Integration Notes
 
 - Register `Renderer.Middleware` or the framework adapter middleware before routes that render Inertia pages.
 - Values in `Props`, shared props, flash data, and validation errors are sent to the browser. Do not put secrets in them.
-- Redirect flash data requires an application-provided `FlashStore`; this package does not include a production session store.
+- For larger pages, define page-specific Go structs and convert them to `inertia.Props` at the render boundary. This keeps the server/frontend contract easier to review.
+- `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production applications should implement `FlashStore` with their session store.
 - `go build` builds Go code only. Templates and Vite assets are deployed as files unless your application embeds them.
 
 ## Core Example
@@ -132,7 +135,10 @@ func main() {
 		panic(err)
 	}
 
-	renderer, err := inertia.New(inertia.Config{RootView: rootView})
+	renderer, err := inertia.New(inertia.Config{
+		RootView:   rootView,
+		FlashStore: inertia.NewMemoryFlashStore(),
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +189,8 @@ vite, err := inertia.NewVite(inertia.ViteConfig{
 })
 ```
 
-Pass the generated tags to `Render`:
+Set generated tags as default render options when every page uses the same
+root template assets.
 
 ```go
 tags, err := vite.Tags()
@@ -191,17 +198,41 @@ if err != nil {
 	return err
 }
 
-return renderer.Render(w, req, "Dashboard", inertia.Props{}, inertia.WithViteTags(tags))
+renderer, err := inertia.New(inertia.Config{
+	RootView:        rootView,
+	VersionProvider: vite.VersionProvider(),
+	DefaultRenderOptions: []inertia.RenderOption{
+		inertia.WithViteTags(tags),
+	},
+})
 ```
+
+You can still pass `inertia.WithViteTags(tags)` to an individual `Render` call
+when a request needs to override the default tags.
 
 ## Flash and Validation
 
-Inertia validation flows usually redirect back and flash validation errors
-instead of returning `422` JSON responses. This package provides the
-`FlashStore` interface but does not include a production session store.
+Inertia validation usually redirects back and flashes validation errors instead
+of returning `422` JSON responses. `go-inertia` provides the `FlashStore`
+interface and a small in-memory implementation for development use.
 
-Applications should implement `FlashStore` with their session library of
-choice.
+```go
+renderer, err := inertia.New(inertia.Config{
+	RootView:   rootView,
+	FlashStore: inertia.NewMemoryFlashStore(),
+})
+```
+
+Use `Back` and `WithValidationErrors` after validation fails.
+
+```go
+return renderer.Back(w, req, inertia.WithValidationErrors(inertia.ValidationErrors{
+	"name": "Name is required",
+}))
+```
+
+Inertia preserves component state after non-GET requests, so applications
+usually do not need to send old input back through server props.
 
 ## React + Vite Example
 

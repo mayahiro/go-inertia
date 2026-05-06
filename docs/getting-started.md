@@ -88,7 +88,45 @@ func main() {
 }
 ```
 
+## Page Props
+
+`Render` accepts `inertia.Props`, which is a `map[string]any`. Small handlers
+can pass the map directly. For pages with several props, define a page-specific
+Go struct and convert it to `inertia.Props` at the render boundary.
+
+```go
+type dashboardStats struct {
+	Users          int `json:"users"`
+	PendingInvites int `json:"pendingInvites"`
+}
+
+type dashboardPageProps struct {
+	Stats dashboardStats `json:"stats"`
+}
+
+func (p dashboardPageProps) Props() inertia.Props {
+	return inertia.Props{
+		"stats": p.Stats,
+	}
+}
+
+err := renderer.Render(w, req, "Dashboard", dashboardPageProps{
+	Stats: dashboardStats{
+		Users:          12,
+		PendingInvites: 3,
+	},
+}.Props())
+```
+
+This pattern keeps component props visible in Go without adding framework-level
+code generation or reflection.
+
 ## Notes
 
 Values in `Props`, shared props, flash data, and validation errors are sent to
 the browser. Do not put secrets or server-only values in them.
+
+Use `Config.DefaultRenderOptions` for render options that apply to every page,
+such as Vite tags. Configure a `FlashStore` when redirects need to carry flash
+messages or validation errors to the next request. `NewMemoryFlashStore` is
+available for local development and single-process examples.

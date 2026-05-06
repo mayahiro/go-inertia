@@ -22,7 +22,9 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 ## Setup
 
 Create a core renderer, wrap it with the Echo adapter, and register the adapter
-middleware.
+middleware. `Renderer.Middleware` is a `net/http` middleware, but the Echo
+adapter exposes `app.Middleware` directly for `e.Use`. Applications do not need
+to call `echo.WrapMiddleware`.
 
 ```go
 package main
@@ -41,7 +43,10 @@ func main() {
 		panic(err)
 	}
 
-	renderer, err := inertia.New(inertia.Config{RootView: rootView})
+	renderer, err := inertia.New(inertia.Config{
+		RootView:   rootView,
+		FlashStore: inertia.NewMemoryFlashStore(),
+	})
 	if err != nil {
 		panic(err)
 	}
