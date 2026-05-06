@@ -68,11 +68,20 @@ func (v *Vite) Tags() (template.HTML, error) {
 	if !ok {
 		return "", errors.New("inertia: vite entry not found in manifest")
 	}
+	assets, err := collectViteAssets(manifest, entry)
+	if err != nil {
+		return "", err
+	}
 
 	var b strings.Builder
-	for _, css := range entry.CSS {
+	for _, css := range assets.CSS {
 		b.WriteString(`<link rel="stylesheet" href="`)
 		b.WriteString(html.EscapeString(v.assetURL(css)))
+		b.WriteString(`">`)
+	}
+	for _, preload := range assets.ModulePreloads {
+		b.WriteString(`<link rel="modulepreload" href="`)
+		b.WriteString(html.EscapeString(v.assetURL(preload)))
 		b.WriteString(`">`)
 	}
 	b.WriteString(`<script type="module" src="`)
@@ -109,6 +118,62 @@ func (v *Vite) readManifest() (map[string]viteManifestEntry, error) {
 		return nil, err
 	}
 	return manifest, nil
+}
+
+type viteAssets struct {
+	CSS            []string
+	ModulePreloads []string
+}
+
+func collectViteAssets(manifest map[string]viteManifestEntry, entry viteManifestEntry) (viteAssets, error) {
+	assets := viteAssets{}
+	seenCSS := map[string]bool{}
+	seenPreload := map[string]bool{}
+	seenImport := map[string]bool{}
+
+	addCSS := func(files []string) {
+		for _, file := range files {
+			if file != "" && !seenCSS[file] {
+				seenCSS[file] = true
+				assets.CSS = append(assets.CSS, file)
+			}
+		}
+	}
+	addPreload := func(file string) {
+		if file != "" && !seenPreload[file] {
+			seenPreload[file] = true
+			assets.ModulePreloads = append(assets.ModulePreloads, file)
+		}
+	}
+
+	var walk func(key string) error
+	walk = func(key string) error {
+		if seenImport[key] {
+			return nil
+		}
+		seenImport[key] = true
+
+		imported, ok := manifest[key]
+		if !ok {
+			return errors.New("inertia: vite import not found in manifest")
+		}
+		addCSS(imported.CSS)
+		addPreload(imported.File)
+		for _, child := range imported.Imports {
+			if err := walk(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	addCSS(entry.CSS)
+	for _, key := range entry.Imports {
+		if err := walk(key); err != nil {
+			return viteAssets{}, err
+		}
+	}
+	return assets, nil
 }
 
 func (v *Vite) devTags() (template.HTML, error) {

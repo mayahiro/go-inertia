@@ -10,6 +10,8 @@ type renderOptions struct {
 	inertiaHead      template.HTML
 	viteTags         template.HTML
 	preserveFragment bool
+	encryptHistory   bool
+	clearHistory     bool
 }
 
 // WithViewData adds extra data for the RootView template.
@@ -37,5 +39,25 @@ func WithViteTags(tags template.HTML) RenderOption {
 func WithRenderPreserveFragment() RenderOption {
 	return func(opts *renderOptions) {
 		opts.preserveFragment = true
+	}
+}
+
+// WithEncryptHistory sets Page.EncryptHistory for the rendered page.
+func WithEncryptHistory(encrypt ...bool) RenderOption {
+	return func(opts *renderOptions) {
+		opts.encryptHistory = true
+		if len(encrypt) > 0 {
+			opts.encryptHistory = encrypt[0]
+		}
+	}
+}
+
+// WithClearHistory sets Page.ClearHistory for the rendered page.
+func WithClearHistory(clear ...bool) RenderOption {
+	return func(opts *renderOptions) {
+		opts.clearHistory = true
+		if len(clear) > 0 {
+			opts.clearHistory = clear[0]
+		}
 	}
 }

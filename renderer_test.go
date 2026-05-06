@@ -144,6 +144,57 @@ func TestRenderOptionsOverrideDefaults(t *testing.T) {
 	}
 }
 
+func TestRenderHistoryOptions(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{},
+		WithEncryptHistory(),
+		WithClearHistory(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if !page.EncryptHistory {
+		t.Fatal("expected encrypt history")
+	}
+	if !page.ClearHistory {
+		t.Fatal("expected clear history")
+	}
+}
+
+func TestRenderHistoryOptionsOverrideDefaults(t *testing.T) {
+	renderer := newTestRenderer(t, Config{
+		DefaultRenderOptions: []RenderOption{
+			WithEncryptHistory(),
+			WithClearHistory(),
+		},
+	})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{},
+		WithEncryptHistory(false),
+		WithClearHistory(false),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if page.EncryptHistory {
+		t.Fatal("encrypt history should be disabled")
+	}
+	if page.ClearHistory {
+		t.Fatal("clear history should be disabled")
+	}
+}
+
 func TestCustomURLResolver(t *testing.T) {
 	renderer := newTestRenderer(t, Config{
 		URLResolver: URLResolverFunc(func(req *http.Request) string {
@@ -1280,6 +1331,273 @@ func TestPartialReloadIgnoredWhenComponentDiffers(t *testing.T) {
 	page := decodePage(t, w)
 	if _, ok := page.Props["filters"]; !ok {
 		t.Fatalf("partial reload should be ignored: %#v", page.Props)
+	}
+}
+
+func TestLazyPropIsSkippedWhenPartialReloadDoesNotRequestIt(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Users/Index")
+	req.Header.Set(HeaderInertiaPartialData, "users")
+	w := httptest.NewRecorder()
+
+	called := false
+	wrappedCalled := false
+	err := renderer.Render(w, req, "Users/Index", Props{
+		"users": []string{"Ada"},
+		"stats": func(req *http.Request) (any, error) {
+			called = true
+			return 42, nil
+		},
+		"summary": Lazy(func(req *http.Request) (any, error) {
+			wrappedCalled = true
+			return "ok", nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("lazy prop should not be resolved")
+	}
+	if wrappedCalled {
+		t.Fatal("wrapped lazy prop should not be resolved")
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["stats"]; ok {
+		t.Fatalf("stats should be omitted: %#v", page.Props)
+	}
+	if _, ok := page.Props["summary"]; ok {
+		t.Fatalf("summary should be omitted: %#v", page.Props)
+	}
+}
+
+func TestLazyPropResolvesOnStandardVisit(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	called := false
+	err := renderer.Render(w, req, "Users/Index", Props{
+		"stats": func(req *http.Request) (any, error) {
+			called = true
+			return 42, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("lazy prop should be resolved")
+	}
+
+	page := decodePage(t, w)
+	if page.Props["stats"].(float64) != 42 {
+		t.Fatalf("unexpected stats: %#v", page.Props["stats"])
+	}
+}
+
+func TestOptionalPropOnlyResolvesWhenExplicitlyRequested(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	called := false
+	err := renderer.Render(w, req, "Users/Index", Props{
+		"companies": Optional(func(req *http.Request) (any, error) {
+			called = true
+			return []string{"ACME"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("optional prop should not resolve on standard visits")
+	}
+	page := decodePage(t, w)
+	if _, ok := page.Props["companies"]; ok {
+		t.Fatalf("companies should be omitted: %#v", page.Props)
+	}
+
+	req = httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Users/Index")
+	req.Header.Set(HeaderInertiaPartialData, "companies")
+	w = httptest.NewRecorder()
+
+	err = renderer.Render(w, req, "Users/Index", Props{
+		"companies": Optional(func(req *http.Request) (any, error) {
+			called = true
+			return []string{"ACME"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("optional prop should resolve when requested")
+	}
+	page = decodePage(t, w)
+	if _, ok := page.Props["companies"]; !ok {
+		t.Fatalf("companies should be included: %#v", page.Props)
+	}
+}
+
+func TestAlwaysPropIsIncludedDuringPartialReloads(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Users/Index")
+	req.Header.Set(HeaderInertiaPartialData, "users")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Users/Index", Props{
+		"users": []string{"Ada"},
+		"auth": Always(func(req *http.Request) (any, error) {
+			return Props{"name": "Hiro"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["auth"]; !ok {
+		t.Fatalf("auth should be included: %#v", page.Props)
+	}
+}
+
+func TestDeferredMergePropAddsMergeMetadataWhenLoaded(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Users/Index", Props{
+		"results": Defer(func(req *http.Request) (any, error) {
+			return Props{"data": []int{1}}, nil
+		}).DeepMerge().MatchOn("data.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := decodePage(t, w)
+	if _, ok := page.Props["results"]; ok {
+		t.Fatalf("deferred results should be omitted: %#v", page.Props)
+	}
+	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "results" {
+		t.Fatalf("unexpected deferred props: %#v", page.DeferredProps)
+	}
+	if len(page.DeepMergeProps) > 0 || len(page.MatchPropsOn) > 0 {
+		t.Fatalf("merge metadata should wait until the prop is loaded: %#v %#v", page.DeepMergeProps, page.MatchPropsOn)
+	}
+
+	req = httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Users/Index")
+	req.Header.Set(HeaderInertiaPartialData, "results")
+	w = httptest.NewRecorder()
+
+	err = renderer.Render(w, req, "Users/Index", Props{
+		"results": Defer(func(req *http.Request) (any, error) {
+			return Props{"data": []int{1}}, nil
+		}).DeepMerge().MatchOn("data.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page = decodePage(t, w)
+	if _, ok := page.Props["results"]; !ok {
+		t.Fatalf("results should be included: %#v", page.Props)
+	}
+	if got := page.DeepMergeProps; len(got) != 1 || got[0] != "results" {
+		t.Fatalf("unexpected deep merge props: %#v", page.DeepMergeProps)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "results.data.id" {
+		t.Fatalf("unexpected match props: %#v", page.MatchPropsOn)
+	}
+}
+
+func TestDeferredOncePropAddsOnceMetadataWhenLoaded(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			return []string{"read"}, nil
+		}).Once(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := decodePage(t, w)
+	if _, ok := page.Props["permissions"]; ok {
+		t.Fatalf("permissions should be deferred: %#v", page.Props)
+	}
+	if _, ok := page.OnceProps["permissions"]; ok {
+		t.Fatalf("once metadata should wait until the prop is loaded: %#v", page.OnceProps)
+	}
+
+	req = httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "permissions")
+	w = httptest.NewRecorder()
+
+	err = renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			return []string{"read"}, nil
+		}).Once(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page = decodePage(t, w)
+	if _, ok := page.Props["permissions"]; !ok {
+		t.Fatalf("permissions should be included: %#v", page.Props)
+	}
+	if got := page.OnceProps["permissions"]; got.Prop != "permissions" {
+		t.Fatalf("unexpected once metadata: %#v", page.OnceProps)
+	}
+}
+
+func TestMergeOncePropUsesRememberedOnceValueWithoutMergeMetadata(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/activity", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaExceptOnceProps, "activity")
+	w := httptest.NewRecorder()
+
+	called := false
+	err := renderer.Render(w, req, "Activity/Index", Props{
+		"activity": Merge(func(req *http.Request) (any, error) {
+			called = true
+			return []string{"login"}, nil
+		}).Once(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("remembered once prop should not resolve")
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["activity"]; ok {
+		t.Fatalf("activity should be omitted: %#v", page.Props)
+	}
+	if got := page.OnceProps["activity"]; got.Prop != "activity" {
+		t.Fatalf("unexpected once metadata: %#v", page.OnceProps)
+	}
+	if len(page.MergeProps) > 0 {
+		t.Fatalf("merge metadata should be omitted with remembered once props: %#v", page.MergeProps)
 	}
 }
 

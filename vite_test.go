@@ -36,6 +36,49 @@ func TestViteManifestTags(t *testing.T) {
 	}
 }
 
+func TestViteManifestTagsIncludeImportedAssets(t *testing.T) {
+	fsys := fstest.MapFS{
+		"manifest.json": {
+			Data: []byte(`{
+				"resources/js/app.jsx": {
+					"file": "assets/app.js",
+					"css": ["assets/app.css"],
+					"imports": ["_vendor.js"]
+				},
+				"_vendor.js": {
+					"file": "assets/vendor.js",
+					"css": ["assets/vendor.css"],
+					"imports": ["_shared.js"]
+				},
+				"_shared.js": {
+					"file": "assets/shared.js",
+					"css": ["assets/shared.css"]
+				}
+			}`),
+		},
+	}
+	vite, err := NewVite(ViteConfig{
+		ManifestFS:   fsys,
+		ManifestPath: "manifest.json",
+		PublicPath:   "/build",
+		Entry:        "resources/js/app.jsx",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tags, err := vite.Tags()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(tags)
+	want := `<link rel="stylesheet" href="/build/assets/app.css"><link rel="stylesheet" href="/build/assets/vendor.css"><link rel="stylesheet" href="/build/assets/shared.css"><link rel="modulepreload" href="/build/assets/vendor.js"><link rel="modulepreload" href="/build/assets/shared.js"><script type="module" src="/build/assets/app.js"></script>`
+	if got != want {
+		t.Fatalf("unexpected tags:\nwant: %s\n got: %s", want, got)
+	}
+}
+
 func TestViteDevTags(t *testing.T) {
 	vite, err := NewVite(ViteConfig{
 		DevServerURL: "http://localhost:5173",

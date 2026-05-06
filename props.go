@@ -84,7 +84,7 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 	}
 	merged.Props["errors"] = Props(errors)
 
-	pageProps := applyPartialReload(req, component, merged.Props)
+	pageProps := applyPartialReload(req, component, merged.Props, merged.AlwaysProps)
 	merged.Metadata.filterForProps(pageProps)
 	merged.Metadata.filterForReset(req)
 
@@ -93,6 +93,8 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		Props:            pageProps,
 		URL:              r.urlResolver.URL(req),
 		Version:          version,
+		EncryptHistory:   opts.encryptHistory,
+		ClearHistory:     opts.clearHistory,
 		PreserveFragment: opts.preserveFragment,
 	}
 	merged.Metadata.applyTo(&page)
@@ -122,7 +124,7 @@ func cloneProps(src Props) Props {
 	return dst
 }
 
-func applyPartialReload(req *http.Request, component string, props Props) Props {
+func applyPartialReload(req *http.Request, component string, props Props, alwaysProps map[string]bool) Props {
 	if !isPartialReloadForComponent(req, component) {
 		return props
 	}
@@ -130,7 +132,7 @@ func applyPartialReload(req *http.Request, component string, props Props) Props 
 	if except := PartialExcept(req); len(except) > 0 {
 		filtered := cloneProps(props)
 		for _, key := range except {
-			if key != "errors" && key != "flash" {
+			if key != "errors" && key != "flash" && !alwaysProps[key] {
 				delete(filtered, key)
 			}
 		}
@@ -143,6 +145,11 @@ func applyPartialReload(req *http.Request, component string, props Props) Props 
 	if data := PartialData(req); len(data) > 0 {
 		filtered := Props{}
 		for _, key := range data {
+			if value, ok := props[key]; ok {
+				filtered[key] = value
+			}
+		}
+		for key := range alwaysProps {
 			if value, ok := props[key]; ok {
 				filtered[key] = value
 			}

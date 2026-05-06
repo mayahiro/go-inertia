@@ -16,6 +16,9 @@ func TestRequestHelpers(t *testing.T) {
 	req.Header.Set(HeaderInertiaErrorBag, "createUser")
 	req.Header.Set(HeaderInertiaInfiniteScrollMergeIntent, "prepend")
 	req.Header.Set(HeaderInertiaExceptOnceProps, "plans, roles")
+	req.Header.Set(HeaderPurpose, "prefetch")
+	req.Header.Set(HeaderPrecognition, "true")
+	req.Header.Set(HeaderPrecognitionValidateOnly, "name, email")
 
 	if !IsInertiaRequest(req) {
 		t.Fatal("expected inertia request")
@@ -43,6 +46,15 @@ func TestRequestHelpers(t *testing.T) {
 	}
 	if !reflect.DeepEqual(ExceptOnceProps(req), []string{"plans", "roles"}) {
 		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))
+	}
+	if !IsPrefetch(req) {
+		t.Fatal("expected prefetch request")
+	}
+	if !IsPrecognition(req) {
+		t.Fatal("expected precognition request")
+	}
+	if !reflect.DeepEqual(PrecognitionValidateOnly(req), []string{"name", "email"}) {
+		t.Fatalf("unexpected precognition fields: %#v", PrecognitionValidateOnly(req))
 	}
 }
 
@@ -75,6 +87,15 @@ func TestRequestHelpersDefaultValues(t *testing.T) {
 	}
 	if ExceptOnceProps(req) != nil {
 		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))
+	}
+	if IsPrefetch(req) {
+		t.Fatal("unexpected prefetch request")
+	}
+	if IsPrecognition(req) {
+		t.Fatal("unexpected precognition request")
+	}
+	if PrecognitionValidateOnly(req) != nil {
+		t.Fatalf("unexpected precognition fields: %#v", PrecognitionValidateOnly(req))
 	}
 }
 

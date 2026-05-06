@@ -28,6 +28,14 @@ const (
 	HeaderInertiaInfiniteScrollMergeIntent = "X-Inertia-Infinite-Scroll-Merge-Intent"
 	// HeaderInertiaExceptOnceProps carries once prop keys already loaded by the client.
 	HeaderInertiaExceptOnceProps = "X-Inertia-Except-Once-Props"
+	// HeaderPurpose carries request purpose hints such as prefetch.
+	HeaderPurpose = "Purpose"
+	// HeaderPrecognition marks Precognition validation requests and responses.
+	HeaderPrecognition = "Precognition"
+	// HeaderPrecognitionValidateOnly carries field names to validate during Precognition.
+	HeaderPrecognitionValidateOnly = "Precognition-Validate-Only"
+	// HeaderPrecognitionSuccess marks successful Precognition validation responses.
+	HeaderPrecognitionSuccess = "Precognition-Success"
 )
 
 // IsInertiaRequest reports whether req is an Inertia request.
@@ -73,6 +81,21 @@ func InfiniteScrollMergeIntent(req *http.Request) string {
 // ExceptOnceProps returns once prop keys the client has already loaded.
 func ExceptOnceProps(req *http.Request) []string {
 	return splitHeaderList(req.Header.Get(HeaderInertiaExceptOnceProps))
+}
+
+// IsPrefetch reports whether req is an Inertia prefetch request.
+func IsPrefetch(req *http.Request) bool {
+	return strings.EqualFold(req.Header.Get(HeaderPurpose), "prefetch")
+}
+
+// IsPrecognition reports whether req is a Precognition validation request.
+func IsPrecognition(req *http.Request) bool {
+	return strings.EqualFold(req.Header.Get(HeaderPrecognition), "true")
+}
+
+// PrecognitionValidateOnly returns field names requested for Precognition validation.
+func PrecognitionValidateOnly(req *http.Request) []string {
+	return splitHeaderList(req.Header.Get(HeaderPrecognitionValidateOnly))
 }
 
 func splitHeaderList(value string) []string {

@@ -9,6 +9,7 @@ type propResult struct {
 	Value    any
 	Metadata pageMetadata
 	Omit     bool
+	Always   bool
 }
 
 type propResolver interface {
@@ -16,9 +17,10 @@ type propResolver interface {
 }
 
 type pageProps struct {
-	Props     Props
-	Metadata  pageMetadata
-	Component string
+	Props       Props
+	Metadata    pageMetadata
+	AlwaysProps map[string]bool
+	Component   string
 }
 
 type pageMetadata struct {
@@ -33,8 +35,9 @@ type pageMetadata struct {
 
 func newPageProps(component string) pageProps {
 	return pageProps{
-		Props:     Props{},
-		Component: component,
+		Props:       Props{},
+		AlwaysProps: map[string]bool{},
+		Component:   component,
 	}
 }
 
@@ -52,6 +55,7 @@ func (p *pageProps) mergePublicProps(req *http.Request, src Props) error {
 
 func (p *pageProps) set(req *http.Request, key string, value any) error {
 	p.Metadata.remove(key)
+	delete(p.AlwaysProps, key)
 
 	result, err := resolveProp(req, p.Component, key, value)
 	if err != nil {
@@ -63,11 +67,17 @@ func (p *pageProps) set(req *http.Request, key string, value any) error {
 	} else {
 		p.Props[key] = result.Value
 	}
+	if result.Always {
+		p.AlwaysProps[key] = true
+	}
 	p.Metadata.merge(result.Metadata)
 	return nil
 }
 
 func resolveProp(req *http.Request, component string, key string, value any) (propResult, error) {
+	if isPropFunc(value) {
+		return newProp(value).resolveProp(req, component, key)
+	}
 	resolver, ok := value.(propResolver)
 	if !ok {
 		return propResult{Value: value}, nil
