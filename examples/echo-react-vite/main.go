@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	echo "github.com/labstack/echo/v5"
 	inertia "github.com/mayahiro/go-inertia"
@@ -34,6 +35,9 @@ type dashboardPageProps struct {
 func (p dashboardPageProps) Props() inertia.Props {
 	return inertia.Props{
 		"stats": p.Stats,
+		"serverTime": inertia.Defer(func(req *http.Request) (any, error) {
+			return time.Now().Format(time.RFC3339), nil
+		}).Once(),
 	}
 }
 
@@ -96,7 +100,7 @@ func main() {
 		FlashStore:      inertia.NewMemoryFlashStore(),
 		SharedProps: inertia.SharedPropsFunc(func(req *http.Request) (inertia.Props, error) {
 			return inertia.Props{
-				"app": appProps{Name: "Go Inertia Admin"},
+				"app": inertia.Always(appProps{Name: "Go Inertia Admin"}),
 			}, nil
 		}),
 		DefaultRenderOptions: []inertia.RenderOption{

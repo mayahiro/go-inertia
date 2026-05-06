@@ -1,3 +1,4 @@
+import { Deferred } from '@inertiajs/react'
 import Layout from './Layout'
 
 type DashboardProps = {
@@ -5,9 +6,10 @@ type DashboardProps = {
     users: number
     version: string
   }
+  serverTime?: string
 }
 
-export default function Dashboard({ stats }: DashboardProps) {
+export default function Dashboard({ stats, serverTime }: DashboardProps) {
   return (
     <Layout>
       <div className="grid">
@@ -19,6 +21,12 @@ export default function Dashboard({ stats }: DashboardProps) {
           <span>Library</span>
           <strong>{stats.version}</strong>
         </div>
+        <Deferred data="serverTime" fallback={<div className="stat"><span>Server time</span><strong>Loading</strong></div>}>
+          <div className="stat">
+            <span>Server time</span>
+            <strong>{serverTime}</strong>
+          </div>
+        </Deferred>
       </div>
     </Layout>
   )
