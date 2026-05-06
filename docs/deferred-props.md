@@ -94,3 +94,9 @@ For multiple props, pass an array to `data`.
   <ProjectAccess />
 </Deferred>
 ```
+
+## Current Limitations
+
+`go-inertia` does not provide deferred prop rescue mode yet. If a deferred prop
+callback returns an error, `Render` returns that error and the response does not
+include `rescuedProps` metadata.

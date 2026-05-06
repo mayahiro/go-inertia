@@ -2,10 +2,11 @@
 
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
-redirects, shared props, flash data, validation errors, top-level partial
-reload filtering, lazy props, optional props, always props, deferred props,
-once props, merge props, composable prop modifiers, infinite scroll props,
-history flags, prefetch detection, and Precognition validation responses.
+redirects, server-side shared prop merging, flash data, validation errors,
+top-level partial reload filtering, lazy props, optional props, always props,
+deferred props, once props, merge props, composable prop modifiers, infinite
+scroll props, history flags, prefetch detection, and Precognition validation
+responses.
 
 ## HTML First Visits
 
@@ -39,7 +40,6 @@ The page object supports these core fields:
 - `encryptHistory`
 - `clearHistory`
 - `preserveFragment`
-- `sharedProps`
 
 It also has JSON fields for advanced prop metadata:
 
@@ -280,3 +280,12 @@ Failed Precognition validation responses use `422 Unprocessable Entity` with:
 ```
 
 Use `PrecognitionSuccess` and `PrecognitionErrors` to write those responses.
+
+## Current Protocol Gaps
+
+The Inertia.js 3.x protocol also defines `rescuedProps` for rescued deferred
+prop failures and `sharedProps` metadata for instant visits. `go-inertia`
+does not populate these fields in `Renderer` responses today.
+
+Shared data is still merged into `props` through `SharedPropsProvider`; it is
+not exposed as `sharedProps` metadata for client-side instant visit carry-over.

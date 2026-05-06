@@ -10,6 +10,10 @@ the Go standard library. Echo v5 support lives in a separate adapter module.
 This project is in the v0 release line. Check the Git tags for available
 versions.
 
+The documentation and example application target Inertia.js 3.x client
+packages. `go-inertia` implements the protocol pieces listed below, but it is
+not a complete replacement for the official Laravel adapter.
+
 ## Package Layout
 
 - `github.com/mayahiro/go-inertia` is the framework-independent core package.
@@ -41,7 +45,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - `Vary: X-Inertia`
 - asset version mismatch handling
 - Inertia redirects, back redirects, and external locations
-- shared props
+- server-side shared props
 - flash data and validation error interfaces
 - single-process in-memory flash store
 - top-level partial reload filtering
@@ -430,6 +434,8 @@ React + Vite + Echo example.
 Some Inertia workflows are not covered by public helpers yet.
 
 - server-side rendering
+- deferred prop rescue metadata (`rescuedProps`)
+- instant-visit shared prop metadata (`sharedProps`)
 - production-ready session store
 - Echo v4 adapter
 - adapters for frameworks other than Echo v5
@@ -476,10 +482,14 @@ go vet ./...
 - Inertia protocol: https://inertiajs.com/docs/v3/core-concepts/the-protocol
 - Inertia redirects: https://inertiajs.com/docs/v3/the-basics/redirects
 - Inertia validation: https://inertiajs.com/docs/v3/the-basics/validation
+- Inertia shared data: https://inertiajs.com/docs/v3/data-props/shared-data
 - Inertia partial reloads: https://inertiajs.com/docs/v3/data-props/partial-reloads
+- Inertia deferred props: https://inertiajs.com/docs/v3/data-props/deferred-props
+- Inertia once props: https://inertiajs.com/docs/v3/data-props/once-props
 - Inertia asset versioning: https://inertiajs.com/docs/v3/advanced/asset-versioning
 - Inertia merging props: https://inertiajs.com/docs/v3/data-props/merging-props
 - Inertia infinite scroll: https://inertiajs.com/docs/v3/data-props/infinite-scroll
+- Inertia instant visits: https://inertiajs.com/docs/v3/the-basics/instant-visits
 - Inertia forms: https://inertiajs.com/docs/v3/the-basics/forms
 - Inertia file uploads: https://inertiajs.com/docs/v3/the-basics/file-uploads
 - Inertia history encryption: https://inertiajs.com/docs/v3/security/history-encryption

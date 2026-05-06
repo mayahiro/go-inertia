@@ -8,7 +8,7 @@ library.
 
 - Go 1.25.0 or newer
 - A root HTML template
-- An Inertia client application
+- An Inertia.js 3.x client application
 
 ## Installation
 
