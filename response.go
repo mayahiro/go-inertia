@@ -30,11 +30,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 		return ErrInvalidComponent
 	}
 
-	options := renderOptions{}
-	for _, opt := range opts {
-		opt(&options)
-	}
-
+	options := r.renderOptionsFrom(opts)
 	page, err := r.page(req, component, props, options)
 	if err != nil {
 		return err
@@ -69,6 +65,17 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 		ViteTags:      options.viteTags,
 		InertiaHead:   options.inertiaHead,
 	})
+}
+
+func (r *Renderer) renderOptionsFrom(opts []RenderOption) renderOptions {
+	options := renderOptions{}
+	for _, opt := range r.renderOptions {
+		opt(&options)
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
 }
 
 // AppendVary appends value to the Vary header without duplicating existing values.

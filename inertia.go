@@ -22,6 +22,7 @@ type Renderer struct {
 	flashStore      FlashStore
 	urlResolver     URLResolver
 	jsonEncoder     JSONEncoder
+	renderOptions   []RenderOption
 }
 
 // Config configures a Renderer.
@@ -37,7 +38,8 @@ type Config struct {
 	// URLResolver returns the URL written into the Inertia page object.
 	URLResolver URLResolver
 	// JSONEncoder encodes Inertia page objects.
-	JSONEncoder JSONEncoder
+	JSONEncoder          JSONEncoder
+	DefaultRenderOptions []RenderOption
 }
 
 // New creates a Renderer from config.
@@ -78,5 +80,6 @@ func New(config Config) (*Renderer, error) {
 		flashStore:      config.FlashStore,
 		urlResolver:     urlResolver,
 		jsonEncoder:     jsonEncoder,
+		renderOptions:   append([]RenderOption(nil), config.DefaultRenderOptions...),
 	}, nil
 }

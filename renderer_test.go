@@ -100,6 +100,49 @@ func TestRenderRejectsEmptyComponent(t *testing.T) {
 	}
 }
 
+func TestDefaultRenderOptions(t *testing.T) {
+	view := NewTemplateRootView(template.Must(template.New("app").Parse(`<!doctype html>{{ .ViteTags }}{{ .InertiaScript }}<div id="app"></div>`)), "app")
+	renderer := newTestRenderer(t, Config{
+		RootView: view,
+		DefaultRenderOptions: []RenderOption{
+			WithViteTags(template.HTML(`<script type="module" src="/build/app.js"></script>`)),
+		},
+	})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(w.Body.String(), `<script type="module" src="/build/app.js"></script>`) {
+		t.Fatalf("default render option was not applied: %s", w.Body.String())
+	}
+}
+
+func TestRenderOptionsOverrideDefaults(t *testing.T) {
+	view := NewTemplateRootView(template.Must(template.New("app").Parse(`<!doctype html>{{ .ViteTags }}{{ .InertiaScript }}<div id="app"></div>`)), "app")
+	renderer := newTestRenderer(t, Config{
+		RootView: view,
+		DefaultRenderOptions: []RenderOption{
+			WithViteTags(template.HTML(`default-tags`)),
+		},
+	})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{}, WithViteTags(template.HTML(`request-tags`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, `request-tags`) || strings.Contains(body, `default-tags`) {
+		t.Fatalf("request render option should override default: %s", body)
+	}
+}
+
 func TestCustomURLResolver(t *testing.T) {
 	renderer := newTestRenderer(t, Config{
 		URLResolver: URLResolverFunc(func(req *http.Request) string {
