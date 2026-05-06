@@ -2,10 +2,11 @@
 
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
-redirects, shared props, flash data, validation errors, and top-level partial
-reload filtering. The page object can also serialize advanced prop metadata
-fields used by current Inertia clients, although public helpers for those
-advanced prop workflows are not available yet.
+redirects, shared props, flash data, validation errors, top-level partial
+reload filtering, and deferred props. The page object can also serialize
+advanced prop metadata fields used by current Inertia clients, although public
+helpers for merge, once, and infinite scroll prop workflows are not available
+yet.
 
 ## HTML First Visits
 
@@ -51,8 +52,8 @@ It also has JSON fields for advanced prop metadata:
 - `deferredProps`
 - `onceProps`
 
-These metadata fields are present so future deferred, once, merge, and infinite
-scroll helpers can use the protocol shape expected by Inertia clients.
+These metadata fields are present so deferred props and future once, merge, and
+infinite scroll helpers can use the protocol shape expected by Inertia clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.
@@ -82,3 +83,25 @@ v0.1 supports top-level prop filtering only.
 - `X-Inertia-Partial-Data` includes only listed top-level props when `Partial-Except` is not set.
 - `errors` is always included.
 - `flash` is included when flash data exists.
+
+## Deferred Props
+
+`Defer` omits the prop from the initial page object and adds the prop name to
+`deferredProps`.
+
+```json
+{
+  "component": "Users/Index",
+  "props": {
+    "errors": {},
+    "users": []
+  },
+  "url": "/users",
+  "deferredProps": {
+    "default": ["permissions"]
+  }
+}
+```
+
+When the client requests the deferred prop with a matching partial reload, the
+callback is evaluated and the resolved prop is included in `props`.

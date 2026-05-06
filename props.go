@@ -36,7 +36,7 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		return Page{}, err
 	}
 
-	merged := newPageProps()
+	merged := newPageProps(component)
 
 	shared, err := r.sharedProps.Props(req)
 	if err != nil {
@@ -122,7 +122,7 @@ func cloneProps(src Props) Props {
 }
 
 func applyPartialReload(req *http.Request, component string, props Props) Props {
-	if !IsInertiaRequest(req) || PartialComponent(req) != component {
+	if !isPartialReloadForComponent(req, component) {
 		return props
 	}
 
@@ -154,4 +154,18 @@ func applyPartialReload(req *http.Request, component string, props Props) Props 
 	}
 
 	return props
+}
+
+func isPartialReloadForComponent(req *http.Request, component string) bool {
+	return IsInertiaRequest(req) && PartialComponent(req) == component
+}
+
+func partialReloadIncludesProp(req *http.Request, key string) bool {
+	if except := PartialExcept(req); len(except) > 0 {
+		return !containsString(except, key)
+	}
+	if data := PartialData(req); len(data) > 0 {
+		return containsString(data, key)
+	}
+	return true
 }

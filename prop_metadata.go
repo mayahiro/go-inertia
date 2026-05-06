@@ -12,12 +12,13 @@ type propResult struct {
 }
 
 type propResolver interface {
-	resolveProp(req *http.Request) (propResult, error)
+	resolveProp(req *http.Request, component string, key string) (propResult, error)
 }
 
 type pageProps struct {
-	Props    Props
-	Metadata pageMetadata
+	Props     Props
+	Metadata  pageMetadata
+	Component string
 }
 
 type pageMetadata struct {
@@ -30,8 +31,11 @@ type pageMetadata struct {
 	OnceProps      map[string]OnceProp
 }
 
-func newPageProps() pageProps {
-	return pageProps{Props: Props{}}
+func newPageProps(component string) pageProps {
+	return pageProps{
+		Props:     Props{},
+		Component: component,
+	}
 }
 
 func (p *pageProps) mergePublicProps(req *http.Request, src Props) error {
@@ -49,7 +53,7 @@ func (p *pageProps) mergePublicProps(req *http.Request, src Props) error {
 func (p *pageProps) set(req *http.Request, key string, value any) error {
 	p.Metadata.remove(key)
 
-	result, err := resolveProp(req, value)
+	result, err := resolveProp(req, p.Component, key, value)
 	if err != nil {
 		return err
 	}
@@ -63,12 +67,12 @@ func (p *pageProps) set(req *http.Request, key string, value any) error {
 	return nil
 }
 
-func resolveProp(req *http.Request, value any) (propResult, error) {
+func resolveProp(req *http.Request, component string, key string, value any) (propResult, error) {
 	resolver, ok := value.(propResolver)
 	if !ok {
 		return propResult{Value: value}, nil
 	}
-	return resolver.resolveProp(req)
+	return resolver.resolveProp(req, component, key)
 }
 
 func (m *pageMetadata) remove(key string) {

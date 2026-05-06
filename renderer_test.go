@@ -371,6 +371,165 @@ func TestPropResolverError(t *testing.T) {
 	}
 }
 
+func TestDeferredPropIsOmittedUntilPartialReload(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"read"}, nil
+		}),
+		"teams": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"admin"}, nil
+		}, "attributes"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("deferred props should not resolve on initial response: %d", calls)
+	}
+	if _, ok := page.Props["permissions"]; ok {
+		t.Fatalf("deferred prop should be omitted: %#v", page.Props)
+	}
+	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "permissions" {
+		t.Fatalf("unexpected default deferred props: %#v", page.DeferredProps)
+	}
+	if got := page.DeferredProps["attributes"]; len(got) != 1 || got[0] != "teams" {
+		t.Fatalf("unexpected grouped deferred props: %#v", page.DeferredProps)
+	}
+}
+
+func TestDeferredPropResolvesWhenRequestedByPartialReload(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "permissions")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"read"}, nil
+		}),
+		"teams": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"admin"}, nil
+		}, "attributes"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("only requested deferred prop should resolve: %d", calls)
+	}
+	if got := page.Props["permissions"].([]any); len(got) != 1 || got[0] != "read" {
+		t.Fatalf("unexpected deferred prop value: %#v", page.Props["permissions"])
+	}
+	if _, ok := page.Props["teams"]; ok {
+		t.Fatalf("unrequested deferred prop should be omitted: %#v", page.Props)
+	}
+	if len(page.DeferredProps) > 0 {
+		t.Fatalf("partial response should not include deferred metadata: %#v", page.DeferredProps)
+	}
+}
+
+func TestDeferredPropRespectsPartialReloadExcept(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialExcept, "filters")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"read"}, nil
+		}),
+		"filters": Props{"q": ""},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("deferred prop should resolve when not excluded: %d", calls)
+	}
+	if _, ok := page.Props["permissions"]; !ok {
+		t.Fatalf("deferred prop should be included: %#v", page.Props)
+	}
+	if _, ok := page.Props["filters"]; ok {
+		t.Fatalf("excluded prop should be omitted: %#v", page.Props)
+	}
+}
+
+func TestDeferredPropIsSkippedWhenPartialReloadDoesNotRequestIt(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "users")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"users": []string{"alice"},
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"read"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("unrequested deferred prop should not resolve: %d", calls)
+	}
+	if _, ok := page.Props["permissions"]; ok {
+		t.Fatalf("unrequested deferred prop should be omitted: %#v", page.Props)
+	}
+	if len(page.DeferredProps) > 0 {
+		t.Fatalf("unrequested partial response should not include deferred metadata: %#v", page.DeferredProps)
+	}
+}
+
+func TestDeferredPropError(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "permissions")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			return nil, errors.New("load failed")
+		}),
+	})
+	if err == nil || err.Error() != "load failed" {
+		t.Fatalf("expected deferred error, got %v", err)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
 func TestContextPropsFlashAndValidationErrorsMerge(t *testing.T) {
 	renderer := newTestRenderer(t, Config{
 		SharedProps: StaticSharedProps(Props{
@@ -665,7 +824,7 @@ type testPropResolver struct {
 	called bool
 }
 
-func (r *testPropResolver) resolveProp(req *http.Request) (propResult, error) {
+func (r *testPropResolver) resolveProp(req *http.Request, component string, key string) (propResult, error) {
 	r.called = true
 	return r.result, r.err
 }

@@ -45,6 +45,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - flash data and validation error interfaces
 - single-process in-memory flash store
 - top-level partial reload filtering
+- deferred props
 - Vite manifest and dev-server tag generation
 - default render options
 - Echo v5 adapter
@@ -234,6 +235,28 @@ return renderer.Back(w, req, inertia.WithValidationErrors(inertia.ValidationErro
 Inertia preserves component state after non-GET requests, so applications
 usually do not need to send old input back through server props.
 
+## Deferred Props
+
+Use `Defer` for props that should be loaded after the first page render. The
+callback runs only when the Inertia client requests the prop through a partial
+reload.
+
+```go
+err := renderer.Render(w, req, "Users/Index", inertia.Props{
+	"users": UserList(),
+	"permissions": inertia.Defer(func(req *http.Request) (any, error) {
+		return PermissionList(req.Context())
+	}),
+})
+```
+
+Deferred props are grouped under `default`. Pass a group name when several
+props should load in a separate request group.
+
+```go
+"teams": inertia.Defer(loadTeams, "attributes")
+```
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
@@ -246,6 +269,7 @@ React + Vite + Echo example.
 - [Echo adapter](docs/echo.md)
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
+- [Deferred props](docs/deferred-props.md)
 
 ## Not Yet Covered by Public Helpers
 
@@ -253,7 +277,6 @@ The core page object can serialize Inertia's advanced prop metadata fields, but
 user-facing helpers are not available yet for these workflows.
 
 - server-side rendering
-- deferred props
 - once props
 - merge, prepend, and deep merge props
 - infinite scroll protocol features

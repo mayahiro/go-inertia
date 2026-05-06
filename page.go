@@ -20,18 +20,28 @@ type Page struct {
 	// PreserveFragment requests preserving the current URL fragment when supported by the client.
 	PreserveFragment bool `json:"preserveFragment,omitempty"`
 	// SharedProps lists shared prop names when supported by the client.
-	SharedProps    []string            `json:"sharedProps,omitempty"`
-	MergeProps     []string            `json:"mergeProps,omitempty"`
-	PrependProps   []string            `json:"prependProps,omitempty"`
-	DeepMergeProps []string            `json:"deepMergeProps,omitempty"`
-	MatchPropsOn   []string            `json:"matchPropsOn,omitempty"`
-	ScrollProps    map[string]any      `json:"scrollProps,omitempty"`
-	DeferredProps  map[string][]string `json:"deferredProps,omitempty"`
-	OnceProps      map[string]OnceProp `json:"onceProps,omitempty"`
+	SharedProps []string `json:"sharedProps,omitempty"`
+	// MergeProps lists prop paths that should be appended during navigation.
+	MergeProps []string `json:"mergeProps,omitempty"`
+	// PrependProps lists prop paths that should be prepended during navigation.
+	PrependProps []string `json:"prependProps,omitempty"`
+	// DeepMergeProps lists prop paths that should be deeply merged during navigation.
+	DeepMergeProps []string `json:"deepMergeProps,omitempty"`
+	// MatchPropsOn lists prop paths used to match items while merging arrays.
+	MatchPropsOn []string `json:"matchPropsOn,omitempty"`
+	// ScrollProps contains infinite scroll metadata keyed by prop name.
+	ScrollProps map[string]any `json:"scrollProps,omitempty"`
+	// DeferredProps groups deferred prop names by request group.
+	DeferredProps map[string][]string `json:"deferredProps,omitempty"`
+	// OnceProps contains once prop metadata keyed by once prop key.
+	OnceProps map[string]OnceProp `json:"onceProps,omitempty"`
 }
 
+// OnceProp describes an Inertia once prop entry in the page object.
 type OnceProp struct {
-	Prop      string `json:"prop"`
+	// Prop is the page prop path reused by the client.
+	Prop string `json:"prop"`
+	// ExpiresAt is a Unix millisecond timestamp, or nil when the prop does not expire.
 	ExpiresAt *int64 `json:"expiresAt"`
 }
 
