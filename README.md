@@ -54,7 +54,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - Register `Renderer.Middleware` or the framework adapter middleware before routes that render Inertia pages.
 - Values in `Props`, shared props, flash data, and validation errors are sent to the browser. Do not put secrets in them.
 - For larger pages, define page-specific Go structs and convert them to `inertia.Props` at the render boundary. This keeps the server/frontend contract easier to review.
-- `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production applications should implement `FlashStore` with their session store.
+- `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production and clustered applications should implement `FlashStore` with their session store, Redis, a database, or another shared backend.
 - `go build` builds Go code only. Templates and Vite assets are deployed as files unless your application embeds them.
 
 ## Core Example

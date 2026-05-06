@@ -19,8 +19,8 @@ It demonstrates:
 - validation errors flashed through `NewMemoryFlashStore`
 
 `NewMemoryFlashStore` is intended for local development and single-process
-examples. Production applications should implement `FlashStore` with a real
-session library.
+examples. Production or clustered applications should implement `FlashStore`
+with a real session library, Redis, a database, or another shared backend.
 
 The Go module uses local `replace` directives for `go-inertia` and the Echo
 adapter, so the example runs against this checkout instead of a published

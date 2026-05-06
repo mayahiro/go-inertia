@@ -17,7 +17,9 @@ type FlashStore interface {
 ```
 
 Production applications should implement `FlashStore` with their session
-library of choice.
+library of choice, Redis, a database, or another shared backend. The core
+package does not include Redis, database, or framework-specific session store
+implementations.
 
 ## MemoryFlashStore
 
@@ -33,7 +35,10 @@ renderer, err := inertia.New(inertia.Config{
 ```
 
 `NewMemoryFlashStore` is not durable storage. Use a different `FlashStore` for
-multi-process deployments, server restarts, or production session policies.
+multi-process deployments, clustered servers, load-balanced instances, server
+restarts, or production session policies. For example, if a POST request stores
+validation errors on instance A and the redirected GET request reaches instance
+B, instance B cannot read process-local flash data from instance A.
 
 ## Configure the Renderer
 
