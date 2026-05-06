@@ -48,6 +48,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - deferred props
 - once props
 - merge, prepend, and deep merge props
+- infinite scroll props
 - Vite manifest and dev-server tag generation
 - default render options
 - Echo v5 adapter
@@ -301,6 +302,32 @@ Use `DeepMerge` when the whole prop should be deeply merged.
 "chat": inertia.Merge(chat).DeepMerge().MatchOn("messages.id")
 ```
 
+## Infinite Scroll
+
+Use `Scroll` for paginated props rendered with the Inertia client
+`InfiniteScroll` component. `go-inertia` does not normalize paginator structs;
+pass the prop value and pagination metadata explicitly.
+
+```go
+err := renderer.Render(w, req, "Posts/Index", inertia.Props{
+	"posts": inertia.Scroll(inertia.Props{
+		"data": posts,
+	}, inertia.ScrollMetadata{
+		PreviousPage: nil,
+		NextPage:     2,
+		CurrentPage:  1,
+	}),
+})
+```
+
+`Scroll` merges the `data` wrapper by default and sets `scrollProps` metadata.
+Use `Wrapper` for a different item wrapper and `MatchOn` when items should be
+matched by an identifier.
+
+```go
+"feed": inertia.Scroll(feed, metadata).Wrapper("items").MatchOn("items.id")
+```
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
@@ -316,15 +343,14 @@ React + Vite + Echo example.
 - [Deferred props](docs/deferred-props.md)
 - [Once props](docs/once-props.md)
 - [Merge props](docs/merge-props.md)
+- [Infinite scroll](docs/infinite-scroll.md)
 
 ## Not Yet Covered by Public Helpers
 
-The core page object can serialize Inertia's advanced prop metadata fields, but
-user-facing helpers are not available yet for these workflows.
+Some Inertia workflows are not covered by public helpers yet.
 
 - server-side rendering
-- combined deferred, once, and merge prop modifiers
-- infinite scroll protocol features
+- combined deferred, once, merge, and scroll prop modifiers
 - history encryption
 - Precognition validation
 - production-ready session store
@@ -375,6 +401,8 @@ go vet ./...
 - Inertia validation: https://inertiajs.com/validation
 - Inertia partial reloads: https://inertiajs.com/partial-reloads
 - Inertia asset versioning: https://inertiajs.com/asset-versioning
+- Inertia merging props: https://inertiajs.com/merging-props
+- Inertia infinite scroll: https://inertiajs.com/infinite-scroll
 - Vite backend integration: https://vite.dev/guide/backend-integration.html
 - Echo: https://echo.labstack.com/
 

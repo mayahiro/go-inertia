@@ -14,6 +14,7 @@ func TestRequestHelpers(t *testing.T) {
 	req.Header.Set(HeaderInertiaPartialExcept, "stats")
 	req.Header.Set(HeaderInertiaReset, "results")
 	req.Header.Set(HeaderInertiaErrorBag, "createUser")
+	req.Header.Set(HeaderInertiaInfiniteScrollMergeIntent, "prepend")
 	req.Header.Set(HeaderInertiaExceptOnceProps, "plans, roles")
 
 	if !IsInertiaRequest(req) {
@@ -36,6 +37,9 @@ func TestRequestHelpers(t *testing.T) {
 	}
 	if ErrorBag(req) != "createUser" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))
+	}
+	if InfiniteScrollMergeIntent(req) != "prepend" {
+		t.Fatalf("unexpected infinite scroll merge intent: %s", InfiniteScrollMergeIntent(req))
 	}
 	if !reflect.DeepEqual(ExceptOnceProps(req), []string{"plans", "roles"}) {
 		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))
@@ -65,6 +69,9 @@ func TestRequestHelpersDefaultValues(t *testing.T) {
 	}
 	if ErrorBag(req) != "" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))
+	}
+	if InfiniteScrollMergeIntent(req) != "" {
+		t.Fatalf("unexpected infinite scroll merge intent: %s", InfiniteScrollMergeIntent(req))
 	}
 	if ExceptOnceProps(req) != nil {
 		t.Fatalf("unexpected except once props: %#v", ExceptOnceProps(req))

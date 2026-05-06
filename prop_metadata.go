@@ -26,7 +26,7 @@ type pageMetadata struct {
 	PrependProps   []string
 	DeepMergeProps []string
 	MatchPropsOn   []string
-	ScrollProps    map[string]any
+	ScrollProps    map[string]ScrollMetadata
 	DeferredProps  map[string][]string
 	OnceProps      map[string]OncePropMetadata
 }
@@ -107,7 +107,7 @@ func (m *pageMetadata) merge(other pageMetadata) {
 
 	if len(other.ScrollProps) > 0 {
 		if m.ScrollProps == nil {
-			m.ScrollProps = map[string]any{}
+			m.ScrollProps = map[string]ScrollMetadata{}
 		}
 		for key, value := range other.ScrollProps {
 			m.ScrollProps[key] = value
@@ -162,6 +162,10 @@ func (m *pageMetadata) filterForProps(props Props) {
 func (m *pageMetadata) filterForReset(req *http.Request) {
 	for _, key := range ResetProps(req) {
 		m.removeMerge(key)
+		if scroll, ok := m.ScrollProps[key]; ok {
+			scroll.Reset = true
+			m.ScrollProps[key] = scroll
+		}
 	}
 }
 
@@ -171,7 +175,6 @@ func (m *pageMetadata) removeMerge(key string) {
 	m.DeepMergeProps = filterPropPaths(m.DeepMergeProps, key)
 	m.MatchPropsOn = filterPropPaths(m.MatchPropsOn, key)
 
-	delete(m.ScrollProps, key)
 	if len(m.ScrollProps) == 0 {
 		m.ScrollProps = nil
 	}

@@ -3,10 +3,8 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, shared props, flash data, validation errors, top-level partial
-reload filtering, deferred props, once props, and merge props. The page object
-can also serialize advanced prop metadata fields used by current Inertia
-clients, although public helpers for infinite scroll prop workflows are not
-available yet.
+reload filtering, deferred props, once props, merge props, and infinite scroll
+props.
 
 ## HTML First Visits
 
@@ -31,7 +29,7 @@ Requests with `X-Inertia: true` receive a JSON page object. The response sets:
 
 ## Page Object
 
-The v0.1 page object supports these core fields:
+The page object supports these core fields:
 
 - `component`
 - `props`
@@ -52,9 +50,8 @@ It also has JSON fields for advanced prop metadata:
 - `deferredProps`
 - `onceProps`
 
-These metadata fields are present so deferred props, once props, merge props,
-and future infinite scroll helpers can use the protocol shape expected by
-Inertia clients.
+These metadata fields use the protocol shape expected by current Inertia
+clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.
@@ -83,6 +80,8 @@ v0.1 supports top-level prop filtering only.
 - `X-Inertia-Partial-Except` excludes listed top-level props.
 - `X-Inertia-Partial-Data` includes only listed top-level props when `Partial-Except` is not set.
 - `X-Inertia-Reset` removes merge metadata for listed top-level props.
+  For infinite scroll props, the matching `scrollProps` entry remains and is
+  marked as reset.
 - `errors` is always included.
 - `flash` is included when flash data exists.
 
@@ -163,3 +162,57 @@ Nested append/prepend paths are serialized as full page prop paths.
 
 When the client sends `X-Inertia-Reset`, matching merge metadata is omitted so
 the client replaces the prop value instead of merging it.
+
+## Infinite Scroll
+
+`Scroll` includes the prop value, adds `scrollProps` metadata, and configures
+the wrapped item data to append or prepend during partial reloads.
+
+```json
+{
+  "component": "Posts/Index",
+  "props": {
+    "errors": {},
+    "posts": {
+      "data": []
+    }
+  },
+  "url": "/posts?page=1",
+  "mergeProps": ["posts.data"],
+  "scrollProps": {
+    "posts": {
+      "pageName": "page",
+      "previousPage": null,
+      "nextPage": 2,
+      "currentPage": 1
+    }
+  }
+}
+```
+
+The client sends `X-Inertia-Infinite-Scroll-Merge-Intent` when loading more
+scroll data. When the value is `prepend`, `go-inertia` emits `prependProps`
+instead of `mergeProps`.
+
+```json
+{
+  "prependProps": ["posts.data"]
+}
+```
+
+When the client also sends `X-Inertia-Reset`, `go-inertia` omits merge and
+prepend metadata and marks the scroll entry as reset.
+
+```json
+{
+  "scrollProps": {
+    "posts": {
+      "pageName": "page",
+      "previousPage": null,
+      "nextPage": 2,
+      "currentPage": 1,
+      "reset": true
+    }
+  }
+}
+```

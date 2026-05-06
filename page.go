@@ -30,7 +30,7 @@ type Page struct {
 	// MatchPropsOn lists prop paths used to match items while merging arrays.
 	MatchPropsOn []string `json:"matchPropsOn,omitempty"`
 	// ScrollProps contains infinite scroll metadata keyed by prop name.
-	ScrollProps map[string]any `json:"scrollProps,omitempty"`
+	ScrollProps map[string]ScrollMetadata `json:"scrollProps,omitempty"`
 	// DeferredProps groups deferred prop names by request group.
 	DeferredProps map[string][]string `json:"deferredProps,omitempty"`
 	// OnceProps contains once prop metadata keyed by once prop key.

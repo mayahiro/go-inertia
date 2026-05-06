@@ -24,6 +24,8 @@ const (
 	HeaderInertiaReset = "X-Inertia-Reset"
 	// HeaderInertiaErrorBag carries the requested validation error bag name.
 	HeaderInertiaErrorBag = "X-Inertia-Error-Bag"
+	// HeaderInertiaInfiniteScrollMergeIntent carries append or prepend intent for infinite scroll.
+	HeaderInertiaInfiniteScrollMergeIntent = "X-Inertia-Infinite-Scroll-Merge-Intent"
 	// HeaderInertiaExceptOnceProps carries once prop keys already loaded by the client.
 	HeaderInertiaExceptOnceProps = "X-Inertia-Except-Once-Props"
 )
@@ -61,6 +63,11 @@ func ResetProps(req *http.Request) []string {
 // ErrorBag returns the requested validation error bag name from req.
 func ErrorBag(req *http.Request) string {
 	return req.Header.Get(HeaderInertiaErrorBag)
+}
+
+// InfiniteScrollMergeIntent returns the requested infinite scroll merge intent.
+func InfiniteScrollMergeIntent(req *http.Request) string {
+	return req.Header.Get(HeaderInertiaInfiniteScrollMergeIntent)
 }
 
 // ExceptOnceProps returns once prop keys the client has already loaded.

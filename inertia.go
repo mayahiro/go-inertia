@@ -38,7 +38,8 @@ type Config struct {
 	// URLResolver returns the URL written into the Inertia page object.
 	URLResolver URLResolver
 	// JSONEncoder encodes Inertia page objects.
-	JSONEncoder          JSONEncoder
+	JSONEncoder JSONEncoder
+	// DefaultRenderOptions are applied to every Render call before request options.
 	DefaultRenderOptions []RenderOption
 }
 

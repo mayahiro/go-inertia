@@ -315,8 +315,8 @@ func TestPropResolverMetadataFollowsPartialReload(t *testing.T) {
 				Metadata: pageMetadata{
 					MergeProps:   []string{"items"},
 					MatchPropsOn: []string{"items.id"},
-					ScrollProps: map[string]any{
-						"items": Props{"pageName": "page"},
+					ScrollProps: map[string]ScrollMetadata{
+						"items": {PageName: "page"},
 					},
 				},
 			},
@@ -327,8 +327,8 @@ func TestPropResolverMetadataFollowsPartialReload(t *testing.T) {
 				Metadata: pageMetadata{
 					MergeProps:   []string{"stats"},
 					MatchPropsOn: []string{"stats.users.id"},
-					ScrollProps: map[string]any{
-						"stats": Props{"pageName": "statsPage"},
+					ScrollProps: map[string]ScrollMetadata{
+						"stats": {PageName: "statsPage"},
 					},
 				},
 			},
@@ -873,6 +873,173 @@ func TestMergePropError(t *testing.T) {
 	})
 	if err == nil || err.Error() != "merge failed" {
 		t.Fatalf("expected merge error, got %v", err)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
+func TestScrollPropAppendsDataAndAddsMetadata(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts?page=1", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Scroll(Props{
+			"data": []map[string]any{{"id": 1}},
+		}, ScrollMetadata{
+			PreviousPage: nil,
+			NextPage:     2,
+			CurrentPage:  1,
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	posts := page.Props["posts"].(map[string]any)
+	if got := posts["data"].([]any); len(got) != 1 {
+		t.Fatalf("unexpected scroll prop value: %#v", page.Props["posts"])
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "posts.data" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if len(page.PrependProps) > 0 {
+		t.Fatalf("unexpected prepend props: %#v", page.PrependProps)
+	}
+	metadata := page.ScrollProps["posts"]
+	if metadata.PageName != "page" || metadata.PreviousPage != nil || metadata.NextPage != float64(2) || metadata.CurrentPage != float64(1) {
+		t.Fatalf("unexpected scroll metadata: %#v", metadata)
+	}
+}
+
+func TestScrollPropPrependsWhenRequested(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/messages?page=1", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaInfiniteScrollMergeIntent, "prepend")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Messages/Index", Props{
+		"messages": Scroll(Props{
+			"data": []map[string]any{{"id": 1}},
+		}, ScrollMetadata{CurrentPage: 1}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if got := page.PrependProps; len(got) != 1 || got[0] != "messages.data" {
+		t.Fatalf("unexpected prepend props: %#v", got)
+	}
+	if len(page.MergeProps) > 0 {
+		t.Fatalf("unexpected merge props: %#v", page.MergeProps)
+	}
+}
+
+func TestScrollPropSupportsWrapperAndMatch(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/feed?feedPage=1", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Feed/Index", Props{
+		"feed": Scroll(Props{
+			"items": []map[string]any{{"id": 1}},
+		}, ScrollMetadata{
+			PageName:    "feedPage",
+			CurrentPage: 1,
+		}).Wrapper("items").MatchOn("items.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if got := page.MergeProps; len(got) != 1 || got[0] != "feed.items" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "feed.items.id" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+	if metadata := page.ScrollProps["feed"]; metadata.PageName != "feedPage" {
+		t.Fatalf("unexpected scroll metadata: %#v", metadata)
+	}
+}
+
+func TestScrollPropResetKeepsScrollMetadata(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts?page=1", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Posts/Index")
+	req.Header.Set(HeaderInertiaPartialData, "posts")
+	req.Header.Set(HeaderInertiaReset, "posts")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Scroll(Props{
+			"data": []map[string]any{{"id": 1}},
+		}, ScrollMetadata{CurrentPage: 1}).MatchOn("data.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["posts"]; !ok {
+		t.Fatalf("reset scroll prop should still be included: %#v", page.Props)
+	}
+	if len(page.MergeProps) > 0 || len(page.PrependProps) > 0 || len(page.MatchPropsOn) > 0 {
+		t.Fatalf("reset scroll prop should not include merge metadata: %#v %#v %#v", page.MergeProps, page.PrependProps, page.MatchPropsOn)
+	}
+	metadata := page.ScrollProps["posts"]
+	if !metadata.Reset {
+		t.Fatalf("reset scroll metadata should be marked: %#v", metadata)
+	}
+}
+
+func TestScrollPropFunction(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Scroll(func(req *http.Request) (any, error) {
+			calls++
+			return Props{"data": []string{"a"}}, nil
+		}, ScrollMetadata{CurrentPage: 1}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("scroll function should resolve: %d", calls)
+	}
+	posts := page.Props["posts"].(map[string]any)
+	if got := posts["data"].([]any); len(got) != 1 || got[0] != "a" {
+		t.Fatalf("unexpected scroll function value: %#v", page.Props["posts"])
+	}
+}
+
+func TestScrollPropError(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Scroll(func(req *http.Request) (any, error) {
+			return nil, errors.New("scroll failed")
+		}, ScrollMetadata{}),
+	})
+	if err == nil || err.Error() != "scroll failed" {
+		t.Fatalf("expected scroll error, got %v", err)
 	}
 	if w.Body.Len() != 0 {
 		t.Fatalf("response should not be written: %s", w.Body.String())

@@ -101,5 +101,5 @@ the prop instead of merging it.
 
 ## Current Limitation
 
-`Defer(...).Merge()`, `Merge(...).Once()`, and infinite scroll helpers are not
-part of the public API yet. Use `Defer`, `Once`, and `Merge` separately.
+`Defer(...).Merge()` and `Merge(...).Once()` style composition is not part of
+the public API yet. Use `Defer`, `Once`, and `Merge` separately.
