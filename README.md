@@ -47,6 +47,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - top-level partial reload filtering
 - deferred props
 - once props
+- merge, prepend, and deep merge props
 - Vite manifest and dev-server tag generation
 - default render options
 - Echo v5 adapter
@@ -277,6 +278,29 @@ Use `As` to share a once key across prop names, `Fresh` to force a reload, and
 "availableRoles": inertia.Once(loadRoles).As("roles")
 ```
 
+## Merge Props
+
+Use `Merge` for props that should append during partial reloads.
+
+```go
+err := renderer.Render(w, req, "Items/Index", inertia.Props{
+	"items": inertia.Merge(items),
+})
+```
+
+Target nested paths with `Append` and `Prepend`, and use `MatchOn` when items
+should be matched by an identifier instead of appended blindly.
+
+```go
+"results": inertia.Merge(results).Append("data").MatchOn("data.id")
+```
+
+Use `DeepMerge` when the whole prop should be deeply merged.
+
+```go
+"chat": inertia.Merge(chat).DeepMerge().MatchOn("messages.id")
+```
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
@@ -291,6 +315,7 @@ React + Vite + Echo example.
 - [Validation and flash](docs/validation-and-flash.md)
 - [Deferred props](docs/deferred-props.md)
 - [Once props](docs/once-props.md)
+- [Merge props](docs/merge-props.md)
 
 ## Not Yet Covered by Public Helpers
 
@@ -298,8 +323,7 @@ The core page object can serialize Inertia's advanced prop metadata fields, but
 user-facing helpers are not available yet for these workflows.
 
 - server-side rendering
-- combined deferred and once props
-- merge, prepend, and deep merge props
+- combined deferred, once, and merge prop modifiers
 - infinite scroll protocol features
 - history encryption
 - Precognition validation

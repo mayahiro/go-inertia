@@ -736,6 +736,149 @@ func TestOncePropError(t *testing.T) {
 	}
 }
 
+func TestMergePropAppendsAtRootByDefault(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/items", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Items/Index", Props{
+		"items": Merge([]map[string]any{{"id": 1}}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if got := page.Props["items"].([]any); len(got) != 1 {
+		t.Fatalf("unexpected merge prop value: %#v", page.Props["items"])
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "items" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+}
+
+func TestMergePropSupportsNestedAppendPrependAndMatch(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/forum", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Forum/Index", Props{
+		"forum": Merge(Props{
+			"posts":         []map[string]any{{"id": 1}},
+			"announcements": []map[string]any{{"uuid": "a"}},
+		}).Append("posts").Prepend("announcements").MatchOn("posts.id", "announcements.uuid"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if got := page.MergeProps; len(got) != 1 || got[0] != "forum.posts" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if got := page.PrependProps; len(got) != 1 || got[0] != "forum.announcements" {
+		t.Fatalf("unexpected prepend props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 2 || got[0] != "forum.posts.id" || got[1] != "forum.announcements.uuid" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+}
+
+func TestMergePropSupportsDeepMerge(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/chat", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Chat/Index", Props{
+		"chat": Merge(Props{
+			"messages": []map[string]any{{"id": 1}},
+		}).DeepMerge().MatchOn("messages.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if got := page.DeepMergeProps; len(got) != 1 || got[0] != "chat" {
+		t.Fatalf("unexpected deep merge props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "chat.messages.id" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+}
+
+func TestMergePropFunction(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/items", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Items/Index", Props{
+		"items": Merge(func(req *http.Request) (any, error) {
+			calls++
+			return []string{"a"}, nil
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("merge function should resolve: %d", calls)
+	}
+	if got := page.Props["items"].([]any); len(got) != 1 || got[0] != "a" {
+		t.Fatalf("unexpected merge function value: %#v", page.Props["items"])
+	}
+}
+
+func TestMergePropResetRemovesMergeMetadata(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/items", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Items/Index")
+	req.Header.Set(HeaderInertiaPartialData, "items")
+	req.Header.Set(HeaderInertiaReset, "items")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Items/Index", Props{
+		"items": Merge([]map[string]any{{"id": 2}}).MatchOn("id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["items"]; !ok {
+		t.Fatalf("reset merge prop should still be included: %#v", page.Props)
+	}
+	if len(page.MergeProps) > 0 || len(page.MatchPropsOn) > 0 {
+		t.Fatalf("reset merge prop should not include merge metadata: %#v %#v", page.MergeProps, page.MatchPropsOn)
+	}
+}
+
+func TestMergePropError(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/items", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Items/Index", Props{
+		"items": Merge(func(req *http.Request) (any, error) {
+			return nil, errors.New("merge failed")
+		}),
+	})
+	if err == nil || err.Error() != "merge failed" {
+		t.Fatalf("expected merge error, got %v", err)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
 func TestContextPropsFlashAndValidationErrorsMerge(t *testing.T) {
 	renderer := newTestRenderer(t, Config{
 		SharedProps: StaticSharedProps(Props{

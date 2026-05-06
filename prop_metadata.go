@@ -159,6 +159,24 @@ func (m *pageMetadata) filterForProps(props Props) {
 	}
 }
 
+func (m *pageMetadata) filterForReset(req *http.Request) {
+	for _, key := range ResetProps(req) {
+		m.removeMerge(key)
+	}
+}
+
+func (m *pageMetadata) removeMerge(key string) {
+	m.MergeProps = filterPropPaths(m.MergeProps, key)
+	m.PrependProps = filterPropPaths(m.PrependProps, key)
+	m.DeepMergeProps = filterPropPaths(m.DeepMergeProps, key)
+	m.MatchPropsOn = filterPropPaths(m.MatchPropsOn, key)
+
+	delete(m.ScrollProps, key)
+	if len(m.ScrollProps) == 0 {
+		m.ScrollProps = nil
+	}
+}
+
 func filterPropPaths(paths []string, key string) []string {
 	if len(paths) == 0 {
 		return nil

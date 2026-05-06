@@ -12,6 +12,7 @@ func TestRequestHelpers(t *testing.T) {
 	req.Header.Set(HeaderInertiaPartialComponent, "Users/Index")
 	req.Header.Set(HeaderInertiaPartialData, "users, filters")
 	req.Header.Set(HeaderInertiaPartialExcept, "stats")
+	req.Header.Set(HeaderInertiaReset, "results")
 	req.Header.Set(HeaderInertiaErrorBag, "createUser")
 	req.Header.Set(HeaderInertiaExceptOnceProps, "plans, roles")
 
@@ -29,6 +30,9 @@ func TestRequestHelpers(t *testing.T) {
 	}
 	if !reflect.DeepEqual(PartialExcept(req), []string{"stats"}) {
 		t.Fatalf("unexpected partial except: %#v", PartialExcept(req))
+	}
+	if !reflect.DeepEqual(ResetProps(req), []string{"results"}) {
+		t.Fatalf("unexpected reset props: %#v", ResetProps(req))
 	}
 	if ErrorBag(req) != "createUser" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))
@@ -55,6 +59,9 @@ func TestRequestHelpersDefaultValues(t *testing.T) {
 	}
 	if PartialExcept(req) != nil {
 		t.Fatalf("unexpected partial except: %#v", PartialExcept(req))
+	}
+	if ResetProps(req) != nil {
+		t.Fatalf("unexpected reset props: %#v", ResetProps(req))
 	}
 	if ErrorBag(req) != "" {
 		t.Fatalf("unexpected error bag: %s", ErrorBag(req))

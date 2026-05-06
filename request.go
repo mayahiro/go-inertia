@@ -20,6 +20,8 @@ const (
 	HeaderInertiaPartialData = "X-Inertia-Partial-Data"
 	// HeaderInertiaPartialExcept carries the prop names to exclude in a partial reload.
 	HeaderInertiaPartialExcept = "X-Inertia-Partial-Except"
+	// HeaderInertiaReset carries the prop names to reset before merging.
+	HeaderInertiaReset = "X-Inertia-Reset"
 	// HeaderInertiaErrorBag carries the requested validation error bag name.
 	HeaderInertiaErrorBag = "X-Inertia-Error-Bag"
 	// HeaderInertiaExceptOnceProps carries once prop keys already loaded by the client.
@@ -49,6 +51,11 @@ func PartialData(req *http.Request) []string {
 // PartialExcept returns the excluded partial reload prop names from req.
 func PartialExcept(req *http.Request) []string {
 	return splitHeaderList(req.Header.Get(HeaderInertiaPartialExcept))
+}
+
+// ResetProps returns prop names the client wants to reset before merging.
+func ResetProps(req *http.Request) []string {
+	return splitHeaderList(req.Header.Get(HeaderInertiaReset))
 }
 
 // ErrorBag returns the requested validation error bag name from req.

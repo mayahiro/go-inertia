@@ -86,6 +86,7 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 
 	pageProps := applyPartialReload(req, component, merged.Props)
 	merged.Metadata.filterForProps(pageProps)
+	merged.Metadata.filterForReset(req)
 
 	page := Page{
 		Component:        component,

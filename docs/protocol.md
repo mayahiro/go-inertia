@@ -3,9 +3,10 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, shared props, flash data, validation errors, top-level partial
-reload filtering, deferred props, and once props. The page object can also serialize
-advanced prop metadata fields used by current Inertia clients, although public
-helpers for merge and infinite scroll prop workflows are not available yet.
+reload filtering, deferred props, once props, and merge props. The page object
+can also serialize advanced prop metadata fields used by current Inertia
+clients, although public helpers for infinite scroll prop workflows are not
+available yet.
 
 ## HTML First Visits
 
@@ -51,8 +52,8 @@ It also has JSON fields for advanced prop metadata:
 - `deferredProps`
 - `onceProps`
 
-These metadata fields are present so deferred props, once props, and future
-merge and infinite scroll helpers can use the protocol shape expected by
+These metadata fields are present so deferred props, once props, merge props,
+and future infinite scroll helpers can use the protocol shape expected by
 Inertia clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
@@ -81,6 +82,7 @@ v0.1 supports top-level prop filtering only.
 - Filtering applies only when `X-Inertia-Partial-Component` matches the rendered component.
 - `X-Inertia-Partial-Except` excludes listed top-level props.
 - `X-Inertia-Partial-Data` includes only listed top-level props when `Partial-Except` is not set.
+- `X-Inertia-Reset` removes merge metadata for listed top-level props.
 - `errors` is always included.
 - `flash` is included when flash data exists.
 
@@ -131,3 +133,33 @@ the once key. The client reports loaded once keys with
 When a later Inertia request includes `X-Inertia-Except-Once-Props: plans`, the
 prop is omitted and the `onceProps` metadata remains in the page object. A
 matching partial reload still resolves the prop when it requests the prop.
+
+## Merge Props
+
+`Merge` includes the prop value and adds merge metadata to the page object. A
+plain merge prop appends at the root prop path.
+
+```json
+{
+  "component": "Items/Index",
+  "props": {
+    "errors": {},
+    "items": []
+  },
+  "url": "/items",
+  "mergeProps": ["items"]
+}
+```
+
+Nested append/prepend paths are serialized as full page prop paths.
+
+```json
+{
+  "mergeProps": ["results.data"],
+  "prependProps": ["results.pinned"],
+  "matchPropsOn": ["results.data.id"]
+}
+```
+
+When the client sends `X-Inertia-Reset`, matching merge metadata is omitted so
+the client replaces the prop value instead of merging it.
