@@ -49,6 +49,57 @@ renderer, err := inertia.New(inertia.Config{
 })
 ```
 
+## Custom FlashStore
+
+A production `FlashStore` usually keeps a stable session id in a cookie and
+stores `FlashData` in a shared backend. `Put` writes flash data before the
+redirect response, `Pull` reads and clears it on the next render, and `Reflash`
+preserves it when middleware returns an asset-version `409 Conflict`.
+
+```go
+type SharedFlashStore struct {
+	backend FlashBackend
+}
+
+func (s *SharedFlashStore) Put(w http.ResponseWriter, req *http.Request, data inertia.FlashData) error {
+	id, err := ensureFlashID(w, req)
+	if err != nil {
+		return err
+	}
+	return s.backend.Set(req.Context(), id, data)
+}
+
+func (s *SharedFlashStore) Pull(req *http.Request) (inertia.FlashData, error) {
+	id, ok := flashID(req)
+	if !ok {
+		return inertia.FlashData{}, nil
+	}
+	data, err := s.backend.Get(req.Context(), id)
+	if err != nil {
+		return inertia.FlashData{}, err
+	}
+	if err := s.backend.Delete(req.Context(), id); err != nil {
+		return inertia.FlashData{}, err
+	}
+	return data, nil
+}
+
+func (s *SharedFlashStore) Reflash(w http.ResponseWriter, req *http.Request) error {
+	id, ok := flashID(req)
+	if !ok {
+		return nil
+	}
+	return s.backend.Extend(req.Context(), id)
+}
+```
+
+The `FlashBackend`, `ensureFlashID`, and `flashID` pieces are application
+specific. They can use Redis, a database, a signed cookie session, or an
+existing session package. A production implementation should preserve
+pull-once behavior, use `req.Context()` for backend operations, set an
+appropriate TTL, and serialize the full `FlashData` value including named
+error bags.
+
 ## Flash Messages
 
 Use `WithFlash` when redirecting after a successful action.
