@@ -45,11 +45,16 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - flash data and validation error interfaces
 - single-process in-memory flash store
 - top-level partial reload filtering
+- lazy, optional, and always props
 - deferred props
 - once props
 - merge, prepend, and deep merge props
+- composable deferred, once, and merge prop modifiers
 - infinite scroll props
-- Vite manifest and dev-server tag generation
+- Precognition request and response helpers
+- history encryption and clear-history flags
+- prefetch request detection
+- Vite manifest, imported chunk, and dev-server tag generation
 - default render options
 - Echo v5 adapter
 
@@ -238,6 +243,31 @@ return renderer.Back(w, req, inertia.WithValidationErrors(inertia.ValidationErro
 Inertia preserves component state after non-GET requests, so applications
 usually do not need to send old input back through server props.
 
+## Lazy, Optional, and Always Props
+
+Plain `func(*http.Request) (any, error)` props are evaluated lazily. During a
+matching partial reload, the callback only runs when the prop is included by
+`only` or not excluded by `except`.
+
+```go
+"companies": func(req *http.Request) (any, error) {
+	return loadCompanies(req.Context())
+}
+```
+
+Use `Optional` for props that should only be sent when explicitly requested with
+the client `only` option.
+
+```go
+"companies": inertia.Optional(loadCompanies)
+```
+
+Use `Always` for props that should be sent even during partial reloads.
+
+```go
+"auth": inertia.Always(currentUser)
+```
+
 ## Deferred Props
 
 Use `Defer` for props that should be loaded after the first page render. The
@@ -302,6 +332,18 @@ Use `DeepMerge` when the whole prop should be deeply merged.
 "chat": inertia.Merge(chat).DeepMerge().MatchOn("messages.id")
 ```
 
+## Composable Prop Modifiers
+
+`Defer`, `Merge`, `Once`, `Optional`, `Always`, and lazy props share the same
+modifier model. Combine them when the Inertia protocol supports the result.
+
+```go
+"results": inertia.Defer(loadResults).DeepMerge().MatchOn("data.id")
+"permissions": inertia.Defer(loadPermissions).Once()
+"activity": inertia.Merge(loadActivity).Once()
+"companies": inertia.Optional(loadCompanies).Once()
+```
+
 ## Infinite Scroll
 
 Use `Scroll` for paginated props rendered with the Inertia client
@@ -333,6 +375,35 @@ itself after form submissions. Use the client `reset` visit option when a
 successful mutation should reload a scroll prop from the first page. Omit
 `reset` when the current loaded list should stay in place.
 
+## Precognition
+
+Precognition requests are validation-only requests. Use `IsPrecognition` and
+`PrecognitionValidateOnly` to detect them and limit validation work.
+
+```go
+if inertia.IsPrecognition(req) {
+	if len(errors) > 0 {
+		return inertia.PrecognitionErrors(w, errors)
+	}
+	inertia.PrecognitionSuccess(w)
+	return nil
+}
+```
+
+Precognition helpers are separate from normal Inertia validation. Regular form
+submissions should still redirect and flash validation errors.
+
+## History Flags
+
+Use render options to set Inertia history flags on a page response.
+
+```go
+return renderer.Render(w, req, "Account/Security", props,
+	inertia.WithEncryptHistory(),
+	inertia.WithClearHistory(),
+)
+```
+
 ## React + Vite Example
 
 See [examples/echo-react-vite](examples/echo-react-vite) for a TypeScript
@@ -345,6 +416,10 @@ React + Vite + Echo example.
 - [Echo adapter](docs/echo.md)
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
+- [Partial reloads and lazy props](docs/partial-reloads.md)
+- [Precognition](docs/precognition.md)
+- [History flags](docs/history.md)
+- [File uploads](docs/file-uploads.md)
 - [Deferred props](docs/deferred-props.md)
 - [Once props](docs/once-props.md)
 - [Merge props](docs/merge-props.md)
@@ -355,9 +430,6 @@ React + Vite + Echo example.
 Some Inertia workflows are not covered by public helpers yet.
 
 - server-side rendering
-- combined deferred, once, merge, and scroll prop modifiers
-- history encryption
-- Precognition validation
 - production-ready session store
 - Echo v4 adapter
 - adapters for frameworks other than Echo v5
@@ -401,13 +473,17 @@ go vet ./...
 
 ## References
 
-- Inertia protocol: https://inertiajs.com/the-protocol
-- Inertia redirects: https://inertiajs.com/redirects
-- Inertia validation: https://inertiajs.com/validation
-- Inertia partial reloads: https://inertiajs.com/partial-reloads
-- Inertia asset versioning: https://inertiajs.com/asset-versioning
-- Inertia merging props: https://inertiajs.com/merging-props
-- Inertia infinite scroll: https://inertiajs.com/infinite-scroll
+- Inertia protocol: https://inertiajs.com/docs/v3/core-concepts/the-protocol
+- Inertia redirects: https://inertiajs.com/docs/v3/the-basics/redirects
+- Inertia validation: https://inertiajs.com/docs/v3/the-basics/validation
+- Inertia partial reloads: https://inertiajs.com/docs/v3/data-props/partial-reloads
+- Inertia asset versioning: https://inertiajs.com/docs/v3/advanced/asset-versioning
+- Inertia merging props: https://inertiajs.com/docs/v3/data-props/merging-props
+- Inertia infinite scroll: https://inertiajs.com/docs/v3/data-props/infinite-scroll
+- Inertia forms: https://inertiajs.com/docs/v3/the-basics/forms
+- Inertia file uploads: https://inertiajs.com/docs/v3/the-basics/file-uploads
+- Inertia history encryption: https://inertiajs.com/docs/v3/security/history-encryption
+- Laravel Precognition: https://laravel.com/docs/13.x/precognition
 - Vite backend integration: https://vite.dev/guide/backend-integration.html
 - Echo: https://echo.labstack.com/
 

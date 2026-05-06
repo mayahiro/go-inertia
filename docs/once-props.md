@@ -68,6 +68,20 @@ Use `Until` to send an expiration timestamp to the client.
 
 The timestamp is serialized in `onceProps` as `expiresAt`.
 
+## Composing Modifiers
+
+Once props can be combined with deferred, merge, optional, and lazy props.
+
+```go
+"permissions": inertia.Defer(loadPermissions).Once()
+"activity": inertia.Merge(loadActivity).Once()
+"companies": inertia.Optional(loadCompanies).Once()
+```
+
+For deferred props, `onceProps` metadata is sent when the deferred prop is
+loaded. For optional props, a standard visit omits the prop until the client
+explicitly requests it with `only`.
+
 ## Partial Reload Behavior
 
 A matching partial reload resolves a once prop when the prop is requested by
@@ -77,8 +91,3 @@ explicitly asks for it.
 
 If a matching partial reload does not request the once prop, the callback is not
 executed and the once metadata is omitted from that partial response.
-
-## Current Limitation
-
-`Defer(...).Once()` style composition is not part of the public API yet. Use
-`Defer` and `Once` separately.

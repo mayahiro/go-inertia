@@ -91,15 +91,28 @@ The page object includes:
 ```
 
 This callback is resolved when the page is rendered. It is not the same as a
-deferred prop.
+deferred prop. During matching partial reloads, the callback only runs when the
+prop is included by `only` or not excluded by `except`.
+
+## Composing Modifiers
+
+Merge props can be combined with `Once` when a mergeable prop should be resolved
+once and then reused by the client on later visits.
+
+```go
+"activity": inertia.Merge(loadActivity).Once()
+```
+
+Use `Defer` before merge modifiers when the first page response should omit the
+prop and load it after mount.
+
+```go
+"results": inertia.Defer(loadResults).Append("data").MatchOn("data.id")
+"chat": inertia.Defer(loadChat).DeepMerge().MatchOn("messages.id")
+```
 
 ## Resetting Props
 
 When the client sends `X-Inertia-Reset`, `go-inertia` keeps the prop value in
 the response but removes merge metadata for that prop. The client then replaces
 the prop instead of merging it.
-
-## Current Limitation
-
-`Defer(...).Merge()` and `Merge(...).Once()` style composition is not part of
-the public API yet. Use `Defer`, `Once`, and `Merge` separately.

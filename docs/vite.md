@@ -35,9 +35,11 @@ vite, err := inertia.NewVite(inertia.ViteConfig{
 In production mode, `Tags` reads the manifest entry and emits:
 
 - a module script tag for the entry JavaScript file
-- stylesheet tags for direct CSS files listed on the entry
+- stylesheet tags for CSS files listed on the entry
+- stylesheet tags for CSS files listed on imported chunks
+- `modulepreload` tags for imported chunks
 
-Imported chunk preload tags are not generated in v0.1.
+Imported chunks are collected recursively from the manifest `imports` graph.
 
 ## Asset Versioning
 

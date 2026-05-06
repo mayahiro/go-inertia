@@ -169,6 +169,6 @@ export default function PostsIndex({ posts }) {
 `go-inertia` expects applications to pass `ScrollMetadata` explicitly. It does
 not inspect or normalize paginator structs from a database library.
 
-`Defer(...).Scroll()`, `Once(...).Scroll()`, and other chained prop modifiers
-are not part of the public API yet. Use `Scroll`, `Defer`, and `Once`
-separately.
+`Scroll` uses the same internal prop modifier model as `Defer`, `Merge`, and
+`Once`, but paginated scroll props already carry merge metadata. Prefer plain
+`Scroll` unless a specific page has a tested need for additional modifiers.

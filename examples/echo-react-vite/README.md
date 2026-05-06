@@ -13,7 +13,9 @@ It demonstrates:
 - Vite production manifest mode
 - Vite tags configured through default render options
 - shared props
+- `Always` shared props
 - typed Go page props converted to `inertia.Props`
+- composed `Defer(...).Once()` props
 - infinite scroll props with the React `InfiniteScroll` component
 - form submission with Inertia `useForm`
 - flash messages

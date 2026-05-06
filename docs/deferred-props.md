@@ -45,6 +45,22 @@ The resulting page object includes:
 
 The client loads each group with a separate partial reload.
 
+## Composing Modifiers
+
+Deferred props can also be marked as mergeable or once props. Merge and once
+metadata is sent when the deferred prop is actually loaded.
+
+```go
+err := renderer.Render(w, req, "Users/Index", inertia.Props{
+	"results": inertia.Defer(loadResults).DeepMerge().MatchOn("data.id"),
+	"permissions": inertia.Defer(loadPermissions).Once(),
+})
+```
+
+The first page response only includes `deferredProps`. When the client loads
+`results`, the response includes `deepMergeProps` and `matchPropsOn`. When the
+client loads `permissions`, the response includes `onceProps`.
+
 ## Partial Reload Behavior
 
 For a matching partial reload, `go-inertia` resolves a deferred prop only when

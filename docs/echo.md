@@ -86,5 +86,5 @@ These methods delegate protocol behavior to the underlying core `Renderer`.
 
 ## Echo v4
 
-Echo v4 is not supported in v0.1. If Echo v4 support is added later, it should
-live in a separate adapter module.
+The published Echo adapter targets Echo v5. If Echo v4 support is added later,
+it should live in a separate adapter module.

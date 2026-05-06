@@ -3,8 +3,9 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, shared props, flash data, validation errors, top-level partial
-reload filtering, deferred props, once props, merge props, and infinite scroll
-props.
+reload filtering, lazy props, optional props, always props, deferred props,
+once props, merge props, composable prop modifiers, infinite scroll props,
+history flags, prefetch detection, and Precognition validation responses.
 
 ## HTML First Visits
 
@@ -74,7 +75,7 @@ Inertia requests.
 
 ## Partial Reloads
 
-v0.1 supports top-level prop filtering only.
+`go-inertia` supports top-level prop filtering.
 
 - Filtering applies only when `X-Inertia-Partial-Component` matches the rendered component.
 - `X-Inertia-Partial-Except` excludes listed top-level props.
@@ -84,6 +85,10 @@ v0.1 supports top-level prop filtering only.
   marked as reset.
 - `errors` is always included.
 - `flash` is included when flash data exists.
+
+Plain `func(*http.Request) (any, error)` props are evaluated lazily. `Optional`
+props are only included when explicitly requested with `Partial-Data`. `Always`
+props are included even during partial reloads.
 
 ## Deferred Props
 
@@ -163,6 +168,19 @@ Nested append/prepend paths are serialized as full page prop paths.
 When the client sends `X-Inertia-Reset`, matching merge metadata is omitted so
 the client replaces the prop value instead of merging it.
 
+## Composable Props
+
+`Defer`, `Merge`, `Once`, `Optional`, `Always`, and lazy function props share a
+single modifier model. Supported combinations include deferred merge props,
+deferred once props, merge once props, and optional once props.
+
+```go
+"results": inertia.Defer(loadResults).DeepMerge().MatchOn("data.id")
+"permissions": inertia.Defer(loadPermissions).Once()
+"activity": inertia.Merge(loadActivity).Once()
+"companies": inertia.Optional(loadCompanies).Once()
+```
+
 ## Infinite Scroll
 
 `Scroll` includes the prop value, adds `scrollProps` metadata, and configures
@@ -216,3 +234,49 @@ prepend metadata and marks the scroll entry as reset.
   }
 }
 ```
+
+## History Flags
+
+Use `WithEncryptHistory` and `WithClearHistory` to set `encryptHistory` and
+`clearHistory` on the page object.
+
+```go
+return renderer.Render(w, req, "Account/Security", props,
+	inertia.WithEncryptHistory(),
+	inertia.WithClearHistory(),
+)
+```
+
+## Prefetch Requests
+
+The Inertia client sends `Purpose: prefetch` for prefetch visits. Use
+`IsPrefetch(req)` when application middleware or handlers need to avoid
+side-effects during prefetch requests.
+
+## Precognition
+
+Precognition validation requests use:
+
+- `Precognition: true`
+- `Precognition-Validate-Only`, when the client validates selected fields
+
+Use `IsPrecognition(req)` and `PrecognitionValidateOnly(req)` to inspect those
+headers.
+
+Successful Precognition validation responses use `204 No Content` with:
+
+- `Precognition: true`
+- `Precognition-Success: true`
+- `Vary: Precognition`
+
+Failed Precognition validation responses use `422 Unprocessable Entity` with:
+
+```json
+{
+  "errors": {
+    "email": ["Email is required"]
+  }
+}
+```
+
+Use `PrecognitionSuccess` and `PrecognitionErrors` to write those responses.
