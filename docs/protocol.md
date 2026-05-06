@@ -3,7 +3,9 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, shared props, flash data, validation errors, and top-level partial
-reload filtering.
+reload filtering. The page object can also serialize advanced prop metadata
+fields used by current Inertia clients, although public helpers for those
+advanced prop workflows are not available yet.
 
 ## HTML First Visits
 
@@ -28,7 +30,7 @@ Requests with `X-Inertia: true` receive a JSON page object. The response sets:
 
 ## Page Object
 
-The v0.1 page object supports these fields:
+The v0.1 page object supports these core fields:
 
 - `component`
 - `props`
@@ -38,6 +40,19 @@ The v0.1 page object supports these fields:
 - `clearHistory`
 - `preserveFragment`
 - `sharedProps`
+
+It also has JSON fields for advanced prop metadata:
+
+- `mergeProps`
+- `prependProps`
+- `deepMergeProps`
+- `matchPropsOn`
+- `scrollProps`
+- `deferredProps`
+- `onceProps`
+
+These metadata fields are present so future deferred, once, merge, and infinite
+scroll helpers can use the protocol shape expected by Inertia clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.

@@ -196,6 +196,181 @@ func TestSharedAndHandlerPropsMerge(t *testing.T) {
 	}
 }
 
+func TestPropResolverAddsPageMetadata(t *testing.T) {
+	items := &testPropResolver{
+		result: propResult{
+			Value: []map[string]any{{"id": 1}},
+			Metadata: pageMetadata{
+				MergeProps:   []string{"items"},
+				MatchPropsOn: []string{"items.id"},
+			},
+		},
+	}
+	permissions := &testPropResolver{
+		result: propResult{
+			Omit: true,
+			Metadata: pageMetadata{
+				DeferredProps: map[string][]string{
+					"default": {"permissions"},
+				},
+			},
+		},
+	}
+	plans := &testPropResolver{
+		result: propResult{
+			Value: []string{"basic"},
+			Metadata: pageMetadata{
+				OnceProps: map[string]OnceProp{
+					"plans": {Prop: "plans"},
+				},
+			},
+		},
+	}
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"items":       items,
+		"permissions": permissions,
+		"plans":       plans,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if !items.called || !permissions.called || !plans.called {
+		t.Fatal("expected prop resolvers to be called")
+	}
+	if _, ok := page.Props["permissions"]; ok {
+		t.Fatalf("omitted prop should not be rendered: %#v", page.Props)
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "items" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "items.id" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "permissions" {
+		t.Fatalf("unexpected deferred props: %#v", page.DeferredProps)
+	}
+	if got := page.OnceProps["plans"]; got.Prop != "plans" {
+		t.Fatalf("unexpected once props: %#v", page.OnceProps)
+	}
+}
+
+func TestPropResolverMetadataIsRemovedWhenPropIsOverridden(t *testing.T) {
+	sharedItems := &testPropResolver{
+		result: propResult{
+			Value: []string{"shared"},
+			Metadata: pageMetadata{
+				MergeProps:   []string{"items"},
+				MatchPropsOn: []string{"items.id"},
+			},
+		},
+	}
+	renderer := newTestRenderer(t, Config{
+		SharedProps: StaticSharedProps(Props{
+			"items": sharedItems,
+		}),
+	})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"items": []string{"handler"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if !sharedItems.called {
+		t.Fatal("expected shared prop resolver to be called")
+	}
+	if page.Props["items"].([]any)[0] != "handler" {
+		t.Fatalf("handler prop should override shared prop: %#v", page.Props["items"])
+	}
+	if len(page.MergeProps) > 0 || len(page.MatchPropsOn) > 0 {
+		t.Fatalf("overridden prop metadata should be removed: %#v %#v", page.MergeProps, page.MatchPropsOn)
+	}
+}
+
+func TestPropResolverMetadataFollowsPartialReload(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "items")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"items": &testPropResolver{
+			result: propResult{
+				Value: []map[string]any{{"id": 1}},
+				Metadata: pageMetadata{
+					MergeProps:   []string{"items"},
+					MatchPropsOn: []string{"items.id"},
+					ScrollProps: map[string]any{
+						"items": Props{"pageName": "page"},
+					},
+				},
+			},
+		},
+		"stats": &testPropResolver{
+			result: propResult{
+				Value: Props{"users": 1},
+				Metadata: pageMetadata{
+					MergeProps:   []string{"stats"},
+					MatchPropsOn: []string{"stats.users.id"},
+					ScrollProps: map[string]any{
+						"stats": Props{"pageName": "statsPage"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if _, ok := page.Props["stats"]; ok {
+		t.Fatalf("partial reload should exclude stats: %#v", page.Props)
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "items" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "items.id" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+	if _, ok := page.ScrollProps["items"]; !ok {
+		t.Fatalf("scroll metadata should keep included props: %#v", page.ScrollProps)
+	}
+	if _, ok := page.ScrollProps["stats"]; ok {
+		t.Fatalf("scroll metadata should follow filtered props: %#v", page.ScrollProps)
+	}
+}
+
+func TestPropResolverError(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"items": &testPropResolver{err: errors.New("resolve failed")},
+	})
+	if err == nil || err.Error() != "resolve failed" {
+		t.Fatalf("expected resolver error, got %v", err)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
 func TestContextPropsFlashAndValidationErrorsMerge(t *testing.T) {
 	renderer := newTestRenderer(t, Config{
 		SharedProps: StaticSharedProps(Props{
@@ -482,4 +657,15 @@ func (s *testFlashStore) Put(w http.ResponseWriter, req *http.Request, data Flas
 func (s *testFlashStore) Reflash(w http.ResponseWriter, req *http.Request) error {
 	s.reflashed = true
 	return nil
+}
+
+type testPropResolver struct {
+	result propResult
+	err    error
+	called bool
+}
+
+func (r *testPropResolver) resolveProp(req *http.Request) (propResult, error) {
+	r.called = true
+	return r.result, r.err
 }

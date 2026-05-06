@@ -36,16 +36,24 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		return Page{}, err
 	}
 
-	merged := Props{}
+	merged := newPageProps()
 
 	shared, err := r.sharedProps.Props(req)
 	if err != nil {
 		return Page{}, err
 	}
-	mergePublicProps(merged, shared)
-	mergePublicProps(merged, SharedPropsFromContext(req.Context()))
-	mergePublicProps(merged, props)
-	mergePublicProps(merged, PropsFromContext(req.Context()))
+	if err := merged.mergePublicProps(req, shared); err != nil {
+		return Page{}, err
+	}
+	if err := merged.mergePublicProps(req, SharedPropsFromContext(req.Context())); err != nil {
+		return Page{}, err
+	}
+	if err := merged.mergePublicProps(req, props); err != nil {
+		return Page{}, err
+	}
+	if err := merged.mergePublicProps(req, PropsFromContext(req.Context())); err != nil {
+		return Page{}, err
+	}
 
 	flashData := FlashData{}
 	if r.flashStore != nil {
@@ -62,7 +70,7 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		mergePublicProps(flash, Props(flashData.Flash))
 		mergePublicProps(flash, Props(contextFlash))
 		if len(flash) > 0 {
-			merged["flash"] = flash
+			merged.Props["flash"] = flash
 		}
 	}
 
@@ -74,15 +82,19 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 			errors = ValidationErrors{bag: Props(bagErrors)}
 		}
 	}
-	merged["errors"] = Props(errors)
+	merged.Props["errors"] = Props(errors)
+
+	pageProps := applyPartialReload(req, component, merged.Props)
+	merged.Metadata.filterForProps(pageProps)
 
 	page := Page{
 		Component:        component,
-		Props:            applyPartialReload(req, component, merged),
+		Props:            pageProps,
 		URL:              r.urlResolver.URL(req),
 		Version:          version,
 		PreserveFragment: opts.preserveFragment,
 	}
+	merged.Metadata.applyTo(&page)
 	return page, nil
 }
 

@@ -247,7 +247,10 @@ React + Vite + Echo example.
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
 
-## Unsupported in v0.1
+## Not Yet Covered by Public Helpers
+
+The core page object can serialize Inertia's advanced prop metadata fields, but
+user-facing helpers are not available yet for these workflows.
 
 - server-side rendering
 - deferred props

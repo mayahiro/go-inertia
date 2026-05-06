@@ -20,7 +20,19 @@ type Page struct {
 	// PreserveFragment requests preserving the current URL fragment when supported by the client.
 	PreserveFragment bool `json:"preserveFragment,omitempty"`
 	// SharedProps lists shared prop names when supported by the client.
-	SharedProps []string `json:"sharedProps,omitempty"`
+	SharedProps    []string            `json:"sharedProps,omitempty"`
+	MergeProps     []string            `json:"mergeProps,omitempty"`
+	PrependProps   []string            `json:"prependProps,omitempty"`
+	DeepMergeProps []string            `json:"deepMergeProps,omitempty"`
+	MatchPropsOn   []string            `json:"matchPropsOn,omitempty"`
+	ScrollProps    map[string]any      `json:"scrollProps,omitempty"`
+	DeferredProps  map[string][]string `json:"deferredProps,omitempty"`
+	OnceProps      map[string]OnceProp `json:"onceProps,omitempty"`
+}
+
+type OnceProp struct {
+	Prop      string `json:"prop"`
+	ExpiresAt *int64 `json:"expiresAt"`
 }
 
 // ValidationErrors is a map of validation error values keyed by field or bag name.
