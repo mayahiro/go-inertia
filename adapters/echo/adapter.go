@@ -21,6 +21,11 @@ func (a *Adapter) Render(c *echo.Context, component string, props inertia.Props,
 	return a.Renderer.Render(c.Response(), c.Request(), component, props, opts...)
 }
 
+// RenderError renders an Inertia error page with status through Echo.
+func (a *Adapter) RenderError(c *echo.Context, component string, props inertia.Props, status int, opts ...inertia.RenderOption) error {
+	return a.Renderer.RenderError(c.Response(), c.Request(), component, props, status, opts...)
+}
+
 // Redirect sends an Inertia-aware redirect through Echo.
 func (a *Adapter) Redirect(c *echo.Context, url string, opts ...inertia.RedirectOption) error {
 	return a.Renderer.Redirect(c.Response(), c.Request(), url, opts...)

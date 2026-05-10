@@ -75,6 +75,24 @@ func TestAdapterRenderHTMLForNormalRequest(t *testing.T) {
 	}
 }
 
+func TestAdapterRenderErrorSetsStatus(t *testing.T) {
+	adapter := New(newRenderer(t, inertia.Config{}))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+	req.Header.Set(inertia.HeaderInertia, "true")
+	w := httptest.NewRecorder()
+	c := e.NewContext(req, w)
+
+	err := adapter.RenderError(c, "Errors/NotFound", inertia.Props{}, http.StatusNotFound)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unexpected status: %d", w.Code)
+	}
+}
+
 func TestAdapterRedirectReturns303ForNonGETInertiaRequest(t *testing.T) {
 	adapter := New(newRenderer(t, inertia.Config{}))
 	e := echo.New()
