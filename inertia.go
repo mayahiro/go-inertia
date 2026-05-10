@@ -14,6 +14,8 @@ var (
 	ErrInvalidComponent = errors.New("inertia: component must not be empty")
 	// ErrComponentNotFound is returned when a configured component checker cannot find a component.
 	ErrComponentNotFound = errors.New("inertia: component not found")
+	// ErrInvalidScrollPaginator is returned when ScrollPage receives a nil paginator.
+	ErrInvalidScrollPaginator = errors.New("inertia: scroll paginator is nil")
 )
 
 // Renderer renders Inertia pages, handles protocol middleware, and creates Inertia redirects.

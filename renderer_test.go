@@ -1162,6 +1162,28 @@ func TestScrollPageUsesPaginator(t *testing.T) {
 	}
 }
 
+func TestScrollPageRejectsNilPaginator(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	assertInvalid := func(t *testing.T, paginator ScrollPaginator) {
+		t.Helper()
+		req := httptest.NewRequest("GET", "/posts?page=1", nil)
+		req.Header.Set(HeaderInertia, "true")
+		w := httptest.NewRecorder()
+
+		err := renderer.Render(w, req, "Posts/Index", Props{
+			"posts": ScrollPage(paginator),
+		})
+		if !errors.Is(err, ErrInvalidScrollPaginator) {
+			t.Fatalf("expected ErrInvalidScrollPaginator, got %v", err)
+		}
+	}
+
+	assertInvalid(t, nil)
+
+	var typedNil *testScrollPaginator
+	assertInvalid(t, typedNil)
+}
+
 func TestScrollPropResetKeepsScrollMetadata(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/posts?page=1", nil)

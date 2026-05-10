@@ -1,5 +1,10 @@
 package inertia
 
+import (
+	"net/http"
+	"reflect"
+)
+
 // ScrollFunc loads an infinite scroll prop for req.
 type ScrollFunc = PropFunc
 
@@ -39,9 +44,27 @@ func ScrollPage(paginator ScrollPaginator, wrapper ...string) ScrollProp {
 	if len(wrapper) > 0 && wrapper[0] != "" {
 		path = wrapper[0]
 	}
+	if isNilScrollPaginator(paginator) {
+		return Scroll(func(_ *http.Request) (any, error) {
+			return nil, ErrInvalidScrollPaginator
+		}, ScrollMetadata{}).Wrapper(path)
+	}
 	return Scroll(Props{
 		path: paginator.ScrollItems(),
 	}, paginator.ScrollMetadata()).Wrapper(path)
+}
+
+func isNilScrollPaginator(paginator ScrollPaginator) bool {
+	if paginator == nil {
+		return true
+	}
+	value := reflect.ValueOf(paginator)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 func scrollMergePath(key string, wrapper string) string {
