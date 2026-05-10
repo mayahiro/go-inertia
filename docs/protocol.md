@@ -49,6 +49,8 @@ It also has JSON fields for advanced prop metadata:
 - `matchPropsOn`
 - `scrollProps`
 - `deferredProps`
+- `rescuedProps`
+- `sharedProps`
 - `onceProps`
 
 These metadata fields use the protocol shape expected by current Inertia
@@ -56,6 +58,10 @@ clients.
 
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.
+
+`sharedProps` lists top-level props registered through `Config.SharedProps` or
+`WithSharedProps`. Handler props and `WithProps` values are not listed there
+when they override the same key.
 
 ## Asset Version Mismatches
 
@@ -281,11 +287,8 @@ Failed Precognition validation responses use `422 Unprocessable Entity` with:
 
 Use `PrecognitionSuccess` and `PrecognitionErrors` to write those responses.
 
-## Current Protocol Gaps
+## Rescued Deferred Props
 
-The Inertia.js 3.x protocol also defines `rescuedProps` for rescued deferred
-prop failures and `sharedProps` metadata for instant visits. `go-inertia`
-does not populate these fields in `Renderer` responses today.
-
-Shared data is still merged into `props` through `SharedPropsProvider`; it is
-not exposed as `sharedProps` metadata for client-side instant visit carry-over.
+Use `Defer(fn).Rescue()` when a failed deferred partial reload should omit the
+prop and include its key in `rescuedProps`. Without `Rescue`, loader errors are
+returned by `Render` and no response body is written.

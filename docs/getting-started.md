@@ -52,7 +52,8 @@ The root template is rendered for normal browser visits. It should include
 ## Renderer
 
 Create a `Renderer` with a root view, register its middleware, and call
-`Render` from handlers.
+`Render` from handlers. Use `RenderError` or `WithRenderStatus` when an
+Inertia page should be returned with a non-200 status code.
 
 ```go
 package main
@@ -125,6 +126,9 @@ code generation or reflection.
 
 Values in `Props`, shared props, flash data, and validation errors are sent to
 the browser. Do not put secrets or server-only values in them.
+
+Configure `ComponentNameTransformer` or `ComponentExistenceChecker` when your
+frontend component naming convention needs server-side enforcement.
 
 Use `Config.DefaultRenderOptions` for render options that apply to every page,
 such as Vite tags. Configure a `FlashStore` when redirects need to carry flash

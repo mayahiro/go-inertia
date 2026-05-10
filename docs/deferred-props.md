@@ -95,8 +95,17 @@ For multiple props, pass an array to `data`.
 </Deferred>
 ```
 
-## Current Limitations
+## Rescue Mode
 
-`go-inertia` does not provide deferred prop rescue mode yet. If a deferred prop
-callback returns an error, `Render` returns that error and the response does not
-include `rescuedProps` metadata.
+Use `Rescue` when the client `<Deferred>` component should render its rescue
+slot after a deferred loader error.
+
+```go
+"permissions": inertia.Defer(loadPermissions).Rescue()
+```
+
+When a rescued deferred prop fails during a matching partial reload, the prop is
+omitted from `props` and its key is included in `rescuedProps`.
+
+Without `Rescue`, callback errors are returned by `Render` and no response body
+is written.

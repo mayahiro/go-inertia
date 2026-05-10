@@ -45,22 +45,26 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - `Vary: X-Inertia`
 - asset version mismatch handling
 - Inertia redirects, back redirects, and external locations
-- server-side shared props
+- server-side shared props and `sharedProps` metadata
+- render status overrides for error pages
+- component name transformation and existence checks
 - flash data and validation error interfaces
 - single-process in-memory flash store
 - top-level partial reload filtering
 - lazy, optional, and always props
-- deferred props
+- deferred props and `rescuedProps` metadata
 - once props
 - merge, prepend, and deep merge props
 - composable deferred, once, and merge prop modifiers
-- infinite scroll props
+- composable deferred and once infinite scroll props
+- infinite scroll props and paginator helpers
 - Precognition request and response helpers
 - history encryption and clear-history flags
 - prefetch request detection
 - Vite manifest, imported chunk, and dev-server tag generation
 - default render options
 - Echo v5 adapter
+- endpoint testing helpers
 
 ## Integration Notes
 
@@ -294,6 +298,13 @@ props should load in a separate request group.
 "teams": inertia.Defer(loadTeams, "attributes")
 ```
 
+Use `Rescue` when the client `<Deferred>` component should render its rescue
+slot instead of failing the whole response if the loader returns an error.
+
+```go
+"permissions": inertia.Defer(loadPermissions).Rescue()
+```
+
 ## Once Props
 
 Use `Once` for props that the client can reuse after the first response.
@@ -351,8 +362,9 @@ modifier model. Combine them when the Inertia protocol supports the result.
 ## Infinite Scroll
 
 Use `Scroll` for paginated props rendered with the Inertia client
-`InfiniteScroll` component. `go-inertia` does not normalize paginator structs;
-pass the prop value and pagination metadata explicitly.
+`InfiniteScroll` component. Pass the prop value and pagination metadata
+explicitly, or adapt an application paginator to `ScrollPaginator` and pass it
+to `ScrollPage`.
 
 ```go
 err := renderer.Render(w, req, "Posts/Index", inertia.Props{
@@ -373,6 +385,18 @@ matched by an identifier.
 ```go
 "feed": inertia.Scroll(feed, metadata).Wrapper("items").MatchOn("items.id")
 ```
+
+`ScrollPage` wraps paginator items under `data` by default and accepts a custom
+wrapper name when the page object uses a different item key.
+
+```go
+"users": inertia.ScrollPage(userPage)
+"feed": inertia.ScrollPage(feedPage, "items")
+```
+
+`go-inertia` does not reflect over arbitrary database paginator structs. Use the
+small `ScrollPaginator` interface or explicit `ScrollMetadata` so pagination
+shape stays application-controlled.
 
 `Scroll` follows the Inertia protocol and does not reset loaded scroll data by
 itself after form submissions. Use the client `reset` visit option when a
@@ -417,6 +441,7 @@ React + Vite + Echo example.
 
 - [Getting started](docs/getting-started.md)
 - [Protocol](docs/protocol.md)
+- [Components](docs/components.md)
 - [Echo adapter](docs/echo.md)
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
@@ -428,14 +453,13 @@ React + Vite + Echo example.
 - [Once props](docs/once-props.md)
 - [Merge props](docs/merge-props.md)
 - [Infinite scroll](docs/infinite-scroll.md)
+- [Testing](docs/testing.md)
 
 ## Not Yet Covered by Public Helpers
 
 Some Inertia workflows are not covered by public helpers yet.
 
 - server-side rendering
-- deferred prop rescue metadata (`rescuedProps`)
-- instant-visit shared prop metadata (`sharedProps`)
 - production-ready session store
 - Echo v4 adapter
 - adapters for frameworks other than Echo v5

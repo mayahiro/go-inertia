@@ -50,6 +50,44 @@ The resulting page object includes `mergeProps` and `scrollProps`.
 }
 ```
 
+## Paginator Interface
+
+Use `ScrollPage` when an application paginator can expose items and metadata
+through the `ScrollPaginator` interface. Passing a nil paginator returns
+`ErrInvalidScrollPaginator` during rendering.
+
+```go
+type UserPage struct {
+	Users        []User
+	Page         int
+	NextPage     *int
+	PreviousPage *int
+}
+
+func (p UserPage) ScrollItems() any {
+	return p.Users
+}
+
+func (p UserPage) ScrollMetadata() inertia.ScrollMetadata {
+	return inertia.ScrollMetadata{
+		PreviousPage: p.PreviousPage,
+		NextPage:     p.NextPage,
+		CurrentPage:  p.Page,
+	}
+}
+
+err := renderer.Render(w, req, "Users/Index", inertia.Props{
+	"users": inertia.ScrollPage(userPage),
+})
+```
+
+`ScrollPage` wraps items under `data` by default. Pass a wrapper name when the
+prop should use a different item wrapper.
+
+```go
+"feed": inertia.ScrollPage(feedPage, "items")
+```
+
 ## Data Wrapper
 
 `Scroll` merges the `data` wrapper by default because Inertia paginated props
@@ -87,6 +125,23 @@ The page object includes:
   "matchPropsOn": ["feed.items.id"]
 }
 ```
+
+## Composing Modifiers
+
+`Scroll` can be composed with deferred and once props.
+
+```go
+"posts": inertia.Defer(loadPosts).Scroll(metadata)
+"feed": inertia.Once(loadFeed).Scroll(metadata).MatchOn("data.id")
+```
+
+For deferred scroll props, the initial response includes `deferredProps` only.
+When the client loads the prop through a partial reload, the response includes
+the prop value, `mergeProps`, and `scrollProps`.
+
+For once scroll props, the first response includes the prop value, `onceProps`,
+`mergeProps`, and `scrollProps`. Later remembered once visits follow normal once
+prop behavior and omit the prop value.
 
 ## Loading Direction
 
@@ -166,9 +221,8 @@ export default function PostsIndex({ posts }) {
 
 ## Current Limitations
 
-`go-inertia` expects applications to pass `ScrollMetadata` explicitly. It does
-not inspect or normalize paginator structs from a database library.
+`go-inertia` does not reflect over arbitrary database paginator structs. Adapt
+them to `ScrollPaginator` or pass explicit `ScrollMetadata`.
 
-`Scroll` uses the same internal prop modifier model as `Defer`, `Merge`, and
-`Once`, but paginated scroll props already carry merge metadata. Prefer plain
-`Scroll` unless a specific page has a tested need for additional modifiers.
+Paginated scroll props already carry merge metadata. Prefer plain `Scroll` or
+`ScrollPage` unless a specific page has a tested need for additional modifiers.
