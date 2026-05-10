@@ -144,6 +144,35 @@ func TestRenderOptionsOverrideDefaults(t *testing.T) {
 	}
 }
 
+func TestRenderStatusOption(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/missing", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Errors/NotFound", Props{}, WithRenderStatus(http.StatusNotFound))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unexpected status: %d", w.Code)
+	}
+}
+
+func TestRenderErrorSetsStatus(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/error", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.RenderError(w, req, "Errors/ServerError", Props{}, http.StatusInternalServerError)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("unexpected status: %d", w.Code)
+	}
+}
+
 func TestRenderHistoryOptions(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/dashboard", nil)
@@ -242,6 +271,9 @@ func TestSharedAndHandlerPropsMerge(t *testing.T) {
 	}
 	if page.Props["message"] != "handler" {
 		t.Fatalf("handler prop did not override shared prop: %#v", page.Props)
+	}
+	if got := page.SharedProps; len(got) != 1 || got[0] != "app" {
+		t.Fatalf("unexpected shared props metadata: %#v", got)
 	}
 	if _, ok := page.Props["errors"].(map[string]any); !ok {
 		t.Fatalf("reserved errors prop was overridden: %#v", page.Props["errors"])
@@ -579,6 +611,37 @@ func TestDeferredPropError(t *testing.T) {
 	}
 	if w.Body.Len() != 0 {
 		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
+func TestDeferredPropRescue(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Dashboard")
+	req.Header.Set(HeaderInertiaPartialData, "permissions")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Dashboard", Props{
+		"permissions": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return nil, errors.New("load failed")
+		}).Rescue(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("deferred prop should resolve once: %d", calls)
+	}
+	if _, ok := page.Props["permissions"]; ok {
+		t.Fatalf("rescued deferred prop should be omitted: %#v", page.Props)
+	}
+	if got := page.RescuedProps; len(got) != 1 || got[0] != "permissions" {
+		t.Fatalf("unexpected rescued props: %#v", got)
 	}
 }
 
@@ -1135,6 +1198,9 @@ func TestContextPropsFlashAndValidationErrorsMerge(t *testing.T) {
 	}
 	if page.Props["message"] != "handler" {
 		t.Fatalf("handler prop should override shared props: %#v", page.Props)
+	}
+	if got := page.SharedProps; len(got) != 2 || got[0] != "contextShared" || got[1] != "global" {
+		t.Fatalf("unexpected shared props metadata: %#v", got)
 	}
 	if page.Props["contextProp"] != "prop" {
 		t.Fatalf("missing context prop: %#v", page.Props)

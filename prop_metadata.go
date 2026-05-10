@@ -20,6 +20,7 @@ type pageProps struct {
 	Props       Props
 	Metadata    pageMetadata
 	AlwaysProps map[string]bool
+	SharedProps map[string]bool
 	Component   string
 }
 
@@ -30,6 +31,7 @@ type pageMetadata struct {
 	MatchPropsOn   []string
 	ScrollProps    map[string]ScrollMetadata
 	DeferredProps  map[string][]string
+	RescuedProps   []string
 	OnceProps      map[string]OncePropMetadata
 }
 
@@ -37,18 +39,20 @@ func newPageProps(component string) pageProps {
 	return pageProps{
 		Props:       Props{},
 		AlwaysProps: map[string]bool{},
+		SharedProps: map[string]bool{},
 		Component:   component,
 	}
 }
 
 func (p *pageProps) mergePublicProps(req *http.Request, src Props) error {
 	for key, value := range src {
-		if key == "errors" || key == "flash" {
+		if isReservedProp(key) {
 			continue
 		}
 		if err := p.set(req, key, value); err != nil {
 			return err
 		}
+		delete(p.SharedProps, key)
 	}
 	return nil
 }
@@ -102,6 +106,8 @@ func (m *pageMetadata) remove(key string) {
 		}
 	}
 
+	m.RescuedProps = filterExactProp(m.RescuedProps, key)
+
 	for onceKey, once := range m.OnceProps {
 		if onceKey == key || once.Prop == key {
 			delete(m.OnceProps, onceKey)
@@ -133,6 +139,8 @@ func (m *pageMetadata) merge(other pageMetadata) {
 		}
 	}
 
+	m.RescuedProps = appendUnique(m.RescuedProps, other.RescuedProps...)
+
 	if len(other.OnceProps) > 0 {
 		if m.OnceProps == nil {
 			m.OnceProps = map[string]OncePropMetadata{}
@@ -150,6 +158,7 @@ func (m pageMetadata) applyTo(page *Page) {
 	page.MatchPropsOn = m.MatchPropsOn
 	page.ScrollProps = m.ScrollProps
 	page.DeferredProps = m.DeferredProps
+	page.RescuedProps = m.RescuedProps
 	page.OnceProps = m.OnceProps
 }
 

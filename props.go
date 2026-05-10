@@ -1,6 +1,9 @@
 package inertia
 
-import "net/http"
+import (
+	"net/http"
+	"sort"
+)
 
 // SharedPropsProvider returns props that are shared by every Inertia page.
 type SharedPropsProvider interface {
@@ -42,10 +45,10 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 	if err != nil {
 		return Page{}, err
 	}
-	if err := merged.mergePublicProps(req, shared); err != nil {
+	if err := merged.mergeSharedProps(req, shared); err != nil {
 		return Page{}, err
 	}
-	if err := merged.mergePublicProps(req, SharedPropsFromContext(req.Context())); err != nil {
+	if err := merged.mergeSharedProps(req, SharedPropsFromContext(req.Context())); err != nil {
 		return Page{}, err
 	}
 	if err := merged.mergePublicProps(req, props); err != nil {
@@ -96,18 +99,48 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		EncryptHistory:   opts.encryptHistory,
 		ClearHistory:     opts.clearHistory,
 		PreserveFragment: opts.preserveFragment,
+		SharedProps:      merged.sharedPropNames(),
 	}
 	merged.Metadata.applyTo(&page)
 	return page, nil
 }
 
+func (p *pageProps) mergeSharedProps(req *http.Request, src Props) error {
+	for key, value := range src {
+		if isReservedProp(key) {
+			continue
+		}
+		if err := p.set(req, key, value); err != nil {
+			return err
+		}
+		p.SharedProps[key] = true
+	}
+	return nil
+}
+
 func mergePublicProps(dst Props, src Props) {
 	for key, value := range src {
-		if key == "errors" || key == "flash" {
+		if isReservedProp(key) {
 			continue
 		}
 		dst[key] = value
 	}
+}
+
+func isReservedProp(key string) bool {
+	return key == "errors" || key == "flash"
+}
+
+func (p pageProps) sharedPropNames() []string {
+	if len(p.SharedProps) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(p.SharedProps))
+	for key := range p.SharedProps {
+		names = append(names, key)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func mergeErrors(dst ValidationErrors, src ValidationErrors) {

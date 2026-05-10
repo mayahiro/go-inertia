@@ -9,6 +9,7 @@ type renderOptions struct {
 	data             map[string]any
 	inertiaHead      template.HTML
 	viteTags         template.HTML
+	statusCode       int
 	preserveFragment bool
 	encryptHistory   bool
 	clearHistory     bool
@@ -32,6 +33,13 @@ func WithInertiaHead(head template.HTML) RenderOption {
 func WithViteTags(tags template.HTML) RenderOption {
 	return func(opts *renderOptions) {
 		opts.viteTags = tags
+	}
+}
+
+// WithRenderStatus sets the HTTP status code for a rendered page.
+func WithRenderStatus(code int) RenderOption {
+	return func(opts *renderOptions) {
+		opts.statusCode = code
 	}
 }
 

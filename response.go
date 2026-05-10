@@ -35,6 +35,10 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 	if err != nil {
 		return err
 	}
+	statusCode := options.statusCode
+	if statusCode == 0 {
+		statusCode = http.StatusOK
+	}
 
 	AppendVary(w.Header(), HeaderInertia)
 
@@ -45,7 +49,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 		}
 		w.Header().Set(HeaderInertia, "true")
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(statusCode)
 		_, err = w.Write(body)
 		return err
 	}
@@ -56,7 +60,7 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(statusCode)
 	return r.rootView.Render(w, RootViewData{
 		Page:          page,
 		PageJSON:      pageJSON,
@@ -65,6 +69,14 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 		ViteTags:      options.viteTags,
 		InertiaHead:   options.inertiaHead,
 	})
+}
+
+// RenderError renders an Inertia error page with status.
+func (r *Renderer) RenderError(w http.ResponseWriter, req *http.Request, component string, props Props, status int, opts ...RenderOption) error {
+	renderOpts := make([]RenderOption, 0, len(opts)+1)
+	renderOpts = append(renderOpts, WithRenderStatus(status))
+	renderOpts = append(renderOpts, opts...)
+	return r.Render(w, req, component, props, renderOpts...)
 }
 
 func (r *Renderer) renderOptionsFrom(opts []RenderOption) renderOptions {

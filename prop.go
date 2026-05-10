@@ -18,6 +18,7 @@ type Prop struct {
 
 	deferred bool
 	group    string
+	rescue   bool
 
 	merge        bool
 	appendPaths  []string
@@ -96,6 +97,15 @@ func (p Prop) Always() Prop {
 func (p Prop) Defer(group ...string) Prop {
 	p.deferred = true
 	p.group = deferredGroup(group)
+	return p
+}
+
+// Rescue omits a failed deferred prop and marks it in Page.RescuedProps.
+func (p Prop) Rescue(rescue ...bool) Prop {
+	p.rescue = true
+	if len(rescue) > 0 {
+		p.rescue = rescue[0]
+	}
 	return p
 }
 
@@ -195,7 +205,14 @@ func (p Prop) resolveDeferred(req *http.Request, component string, key string) (
 	if !partialReloadIncludesProp(req, key) {
 		return propResult{Omit: true}, nil
 	}
-	return p.resolveIncluded(req, key)
+	result, err := p.resolveIncluded(req, key)
+	if err != nil && p.rescue {
+		return propResult{
+			Omit:     true,
+			Metadata: rescuedPropMetadata(key),
+		}, nil
+	}
+	return result, err
 }
 
 func (p Prop) resolveIncluded(req *http.Request, key string) (propResult, error) {

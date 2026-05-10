@@ -25,3 +25,9 @@ func deferredPropMetadata(group string, key string) pageMetadata {
 		},
 	}
 }
+
+func rescuedPropMetadata(key string) pageMetadata {
+	return pageMetadata{
+		RescuedProps: []string{key},
+	}
+}

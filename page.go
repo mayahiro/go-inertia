@@ -19,6 +19,8 @@ type Page struct {
 	ClearHistory bool `json:"clearHistory,omitempty"`
 	// PreserveFragment requests preserving the current URL fragment when supported by the client.
 	PreserveFragment bool `json:"preserveFragment,omitempty"`
+	// RescuedProps lists deferred props that failed and were rescued.
+	RescuedProps []string `json:"rescuedProps,omitempty"`
 	// SharedProps lists shared prop names when supported by the client.
 	SharedProps []string `json:"sharedProps,omitempty"`
 	// MergeProps lists prop paths that should be appended during navigation.
