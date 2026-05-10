@@ -12,17 +12,21 @@ var (
 	ErrMissingFlashStore = errors.New("inertia: flash store is not configured")
 	// ErrInvalidComponent is returned when a render call receives an empty component name.
 	ErrInvalidComponent = errors.New("inertia: component must not be empty")
+	// ErrComponentNotFound is returned when a configured component checker cannot find a component.
+	ErrComponentNotFound = errors.New("inertia: component not found")
 )
 
 // Renderer renders Inertia pages, handles protocol middleware, and creates Inertia redirects.
 type Renderer struct {
-	rootView        RootView
-	versionProvider VersionProvider
-	sharedProps     SharedPropsProvider
-	flashStore      FlashStore
-	urlResolver     URLResolver
-	jsonEncoder     JSONEncoder
-	renderOptions   []RenderOption
+	rootView             RootView
+	versionProvider      VersionProvider
+	sharedProps          SharedPropsProvider
+	flashStore           FlashStore
+	urlResolver          URLResolver
+	jsonEncoder          JSONEncoder
+	renderOptions        []RenderOption
+	componentTransformer ComponentNameTransformer
+	componentChecker     ComponentExistenceChecker
 }
 
 // Config configures a Renderer.
@@ -41,6 +45,10 @@ type Config struct {
 	JSONEncoder JSONEncoder
 	// DefaultRenderOptions are applied to every Render call before request options.
 	DefaultRenderOptions []RenderOption
+	// ComponentNameTransformer transforms component names before rendering.
+	ComponentNameTransformer ComponentNameTransformer
+	// ComponentExistenceChecker checks transformed component names before rendering.
+	ComponentExistenceChecker ComponentExistenceChecker
 }
 
 // New creates a Renderer from config.
@@ -75,12 +83,14 @@ func New(config Config) (*Renderer, error) {
 	}
 
 	return &Renderer{
-		rootView:        config.RootView,
-		versionProvider: versionProvider,
-		sharedProps:     sharedProps,
-		flashStore:      config.FlashStore,
-		urlResolver:     urlResolver,
-		jsonEncoder:     jsonEncoder,
-		renderOptions:   append([]RenderOption(nil), config.DefaultRenderOptions...),
+		rootView:             config.RootView,
+		versionProvider:      versionProvider,
+		sharedProps:          sharedProps,
+		flashStore:           config.FlashStore,
+		urlResolver:          urlResolver,
+		jsonEncoder:          jsonEncoder,
+		renderOptions:        append([]RenderOption(nil), config.DefaultRenderOptions...),
+		componentTransformer: config.ComponentNameTransformer,
+		componentChecker:     config.ComponentExistenceChecker,
 	}, nil
 }

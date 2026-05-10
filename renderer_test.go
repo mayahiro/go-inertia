@@ -101,6 +101,53 @@ func TestRenderRejectsEmptyComponent(t *testing.T) {
 	}
 }
 
+func TestRenderTransformsComponentName(t *testing.T) {
+	renderer := newTestRenderer(t, Config{
+		ComponentNameTransformer: func(component string) string {
+			return component + "/Page"
+		},
+	})
+	req := httptest.NewRequest("GET", "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Users/Index", Props{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	if page.Component != "Users/Index/Page" {
+		t.Fatalf("unexpected component: %s", page.Component)
+	}
+}
+
+func TestRenderChecksComponentExistence(t *testing.T) {
+	checked := ""
+	renderer := newTestRenderer(t, Config{
+		ComponentNameTransformer: func(component string) string {
+			return component + "/Page"
+		},
+		ComponentExistenceChecker: ComponentExistsFunc(func(component string) (bool, error) {
+			checked = component
+			return false, nil
+		}),
+	})
+	req := httptest.NewRequest("GET", "/users", nil)
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Users/Index", Props{})
+	if !errors.Is(err, ErrComponentNotFound) {
+		t.Fatalf("expected ErrComponentNotFound, got %v", err)
+	}
+	if checked != "Users/Index/Page" {
+		t.Fatalf("unexpected checked component: %s", checked)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("response should not be written: %s", w.Body.String())
+	}
+}
+
 func TestDefaultRenderOptions(t *testing.T) {
 	view := NewTemplateRootView(template.Must(template.New("app").Parse(`<!doctype html>{{ .ViteTags }}{{ .InertiaScript }}<div id="app"></div>`)), "app")
 	renderer := newTestRenderer(t, Config{
@@ -1084,6 +1131,37 @@ func TestScrollPropSupportsWrapperAndMatch(t *testing.T) {
 	}
 }
 
+func TestScrollPageUsesPaginator(t *testing.T) {
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts?page=1", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": ScrollPage(testScrollPaginator{
+			items:       []map[string]any{{"id": 1}},
+			currentPage: 1,
+			nextPage:    2,
+		}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page := decodePage(t, w)
+	posts := page.Props["posts"].(map[string]any)
+	if got := posts["data"].([]any); len(got) != 1 {
+		t.Fatalf("unexpected scroll page value: %#v", page.Props["posts"])
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "posts.data" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	metadata := page.ScrollProps["posts"]
+	if metadata.CurrentPage != float64(1) || metadata.NextPage != float64(2) {
+		t.Fatalf("unexpected scroll metadata: %#v", metadata)
+	}
+}
+
 func TestScrollPropResetKeepsScrollMetadata(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/posts?page=1", nil)
@@ -1634,6 +1712,100 @@ func TestDeferredOncePropAddsOnceMetadataWhenLoaded(t *testing.T) {
 	}
 }
 
+func TestDeferredScrollPropAddsScrollMetadataWhenLoaded(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return Props{"data": []string{"a"}}, nil
+		}).Scroll(ScrollMetadata{CurrentPage: 1, NextPage: 2}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := decodePage(t, w)
+	if calls != 0 {
+		t.Fatalf("deferred scroll prop should not resolve initially: %d", calls)
+	}
+	if _, ok := page.Props["posts"]; ok {
+		t.Fatalf("posts should be deferred: %#v", page.Props)
+	}
+	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "posts" {
+		t.Fatalf("unexpected deferred props: %#v", page.DeferredProps)
+	}
+	if len(page.ScrollProps) > 0 || len(page.MergeProps) > 0 {
+		t.Fatalf("scroll metadata should wait until the prop is loaded: %#v %#v", page.ScrollProps, page.MergeProps)
+	}
+
+	req = httptest.NewRequest("GET", "/posts", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaPartialComponent, "Posts/Index")
+	req.Header.Set(HeaderInertiaPartialData, "posts")
+	w = httptest.NewRecorder()
+
+	err = renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Defer(func(req *http.Request) (any, error) {
+			calls++
+			return Props{"data": []string{"a"}}, nil
+		}).Scroll(ScrollMetadata{CurrentPage: 1, NextPage: 2}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page = decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("deferred scroll prop should resolve once: %d", calls)
+	}
+	if _, ok := page.Props["posts"]; !ok {
+		t.Fatalf("posts should be included: %#v", page.Props)
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "posts.data" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if metadata := page.ScrollProps["posts"]; metadata.CurrentPage != float64(1) || metadata.NextPage != float64(2) {
+		t.Fatalf("unexpected scroll metadata: %#v", metadata)
+	}
+}
+
+func TestOnceScrollPropAddsScrollMetadata(t *testing.T) {
+	calls := 0
+	renderer := newTestRenderer(t, Config{})
+	req := httptest.NewRequest("GET", "/posts", nil)
+	req.Header.Set(HeaderInertia, "true")
+	w := httptest.NewRecorder()
+
+	err := renderer.Render(w, req, "Posts/Index", Props{
+		"posts": Once(func(req *http.Request) (any, error) {
+			calls++
+			return Props{"data": []string{"a"}}, nil
+		}).Scroll(ScrollMetadata{CurrentPage: 1}).MatchOn("data.id"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := decodePage(t, w)
+	if calls != 1 {
+		t.Fatalf("once scroll prop should resolve: %d", calls)
+	}
+	if got := page.OnceProps["posts"]; got.Prop != "posts" {
+		t.Fatalf("unexpected once metadata: %#v", page.OnceProps)
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "posts.data" {
+		t.Fatalf("unexpected merge props: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "posts.data.id" {
+		t.Fatalf("unexpected match props: %#v", got)
+	}
+	if metadata := page.ScrollProps["posts"]; metadata.CurrentPage != float64(1) {
+		t.Fatalf("unexpected scroll metadata: %#v", metadata)
+	}
+}
+
 func TestMergeOncePropUsesRememberedOnceValueWithoutMergeMetadata(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/activity", nil)
@@ -1727,4 +1899,21 @@ type testPropResolver struct {
 func (r *testPropResolver) resolveProp(req *http.Request, component string, key string) (propResult, error) {
 	r.called = true
 	return r.result, r.err
+}
+
+type testScrollPaginator struct {
+	items       any
+	currentPage any
+	nextPage    any
+}
+
+func (p testScrollPaginator) ScrollItems() any {
+	return p.items
+}
+
+func (p testScrollPaginator) ScrollMetadata() ScrollMetadata {
+	return ScrollMetadata{
+		CurrentPage: p.currentPage,
+		NextPage:    p.nextPage,
+	}
 }

@@ -20,12 +20,28 @@ type ScrollMetadata struct {
 // ScrollProp marks a page prop as an infinite scroll prop.
 type ScrollProp = Prop
 
+// ScrollPaginator exposes paginated data in the shape required by ScrollPage.
+type ScrollPaginator interface {
+	// ScrollItems returns the items for the current page.
+	ScrollItems() any
+	// ScrollMetadata returns the pagination state for the current page.
+	ScrollMetadata() ScrollMetadata
+}
+
 // Scroll returns an infinite scroll prop with explicit pagination metadata.
 func Scroll(value any, metadata ScrollMetadata) ScrollProp {
-	p := newProp(value)
-	p.scroll = true
-	p.scrollMetadata = metadata
-	return p
+	return newProp(value).Scroll(metadata)
+}
+
+// ScrollPage returns an infinite scroll prop from a paginator interface.
+func ScrollPage(paginator ScrollPaginator, wrapper ...string) ScrollProp {
+	path := "data"
+	if len(wrapper) > 0 && wrapper[0] != "" {
+		path = wrapper[0]
+	}
+	return Scroll(Props{
+		path: paginator.ScrollItems(),
+	}, paginator.ScrollMetadata()).Wrapper(path)
 }
 
 func scrollMergePath(key string, wrapper string) string {

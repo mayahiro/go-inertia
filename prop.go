@@ -179,6 +179,13 @@ func (p Prop) Wrapper(path string) Prop {
 	return p
 }
 
+// Scroll returns p configured as an infinite scroll prop.
+func (p Prop) Scroll(metadata ScrollMetadata) Prop {
+	p.scroll = true
+	p.scrollMetadata = metadata
+	return p
+}
+
 func (p Prop) resolveProp(req *http.Request, component string, key string) (propResult, error) {
 	if p.deferred {
 		return p.resolveDeferred(req, component, key)

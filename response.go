@@ -26,8 +26,9 @@ func (StandardJSONEncoder) Encode(v any) ([]byte, error) {
 // For Inertia requests it writes a JSON page response.
 // For normal browser visits it renders the configured RootView.
 func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component string, props Props, opts ...RenderOption) error {
-	if component == "" {
-		return ErrInvalidComponent
+	component, err := r.prepareComponent(component)
+	if err != nil {
+		return err
 	}
 
 	options := r.renderOptionsFrom(opts)
