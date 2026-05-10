@@ -115,6 +115,9 @@ a {
 .button {
   min-height: 40px;
   align-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 6px;
   padding: 8px 14px;
@@ -122,6 +125,11 @@ a {
   color: #ffffff;
   font: inherit;
   font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link {
+  margin-top: 8px;
 }
 
 .error {
@@ -136,4 +144,26 @@ a {
   padding: 12px 14px;
   background: #edf8f0;
   color: #135c2f;
+}
+
+.not-found {
+  display: grid;
+  gap: 10px;
+}
+
+.not-found h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #5c667a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.muted {
+  margin: 0;
+  color: #5c667a;
 }

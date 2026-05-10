@@ -147,6 +147,10 @@ func main() {
 		}))
 	})
 
+	e.RouteNotFound("/*", func(c *echo.Context) error {
+		return app.RenderError(c, "Errors/NotFound", inertia.Props{}, http.StatusNotFound)
+	})
+
 	if err := e.Start(serverAddress()); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		e.Logger.Error("server error", "error", err)
 	}

@@ -20,6 +20,7 @@ It demonstrates:
 - form submission with Inertia `useForm`
 - flash messages
 - validation errors flashed through `NewMemoryFlashStore`
+- a 404 fallback route rendered with the Echo adapter `RenderError` helper
 
 The Users page intentionally sends `reset: ["users"]` after a successful create
 so the infinite scroll list is rebuilt and the newly created user appears on
