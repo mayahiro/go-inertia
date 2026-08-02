@@ -34,6 +34,9 @@ type Prop struct {
 	scroll         bool
 	scrollMetadata ScrollMetadata
 	scrollWrapper  string
+	wrapperSet     bool
+
+	invalidReason string
 }
 
 type propMode int
@@ -45,9 +48,16 @@ const (
 	propModeAlways
 )
 
-// Lazy returns a prop that is evaluated only when the response includes it.
-func Lazy(fn PropFunc) Prop {
+// Computed returns a normal prop whose callback is evaluated only when the response includes it.
+func Computed(fn PropFunc) Prop {
 	return newProp(fn)
+}
+
+// Lazy returns a prop that is evaluated only when the response includes it.
+//
+// Deprecated: use Computed. Lazy is not the removed Inertia v3 LazyProp type.
+func Lazy(fn PropFunc) Prop {
+	return Computed(fn)
 }
 
 // Optional returns a prop that is only included when explicitly requested.
@@ -95,6 +105,9 @@ func (p Prop) Always() Prop {
 
 // Defer returns p configured as a deferred prop.
 func (p Prop) Defer(group ...string) Prop {
+	if len(group) > 1 {
+		p.invalidReason = "Defer accepts at most one group"
+	}
 	p.deferred = true
 	p.group = deferredGroup(group)
 	return p
@@ -102,6 +115,9 @@ func (p Prop) Defer(group ...string) Prop {
 
 // Rescue omits a failed deferred prop and marks it in Page.RescuedProps.
 func (p Prop) Rescue(rescue ...bool) Prop {
+	if len(rescue) > 1 {
+		p.invalidReason = "Rescue accepts at most one boolean"
+	}
 	p.rescue = true
 	if len(rescue) > 0 {
 		p.rescue = rescue[0]
@@ -157,6 +173,9 @@ func (p Prop) As(key string) Prop {
 
 // Fresh returns p configured to ignore the client's remembered once value.
 func (p Prop) Fresh(fresh ...bool) Prop {
+	if len(fresh) > 1 {
+		p.invalidReason = "Fresh accepts at most one boolean"
+	}
 	p.once = true
 	p.fresh = true
 	if len(fresh) > 0 {
@@ -176,6 +195,7 @@ func (p Prop) Until(t time.Time) Prop {
 // Wrapper returns p configured to merge a custom infinite scroll data wrapper.
 func (p Prop) Wrapper(path string) Prop {
 	p.scrollWrapper = path
+	p.wrapperSet = true
 	return p
 }
 
@@ -186,51 +206,72 @@ func (p Prop) Scroll(metadata ScrollMetadata) Prop {
 	return p
 }
 
-func (p Prop) resolveProp(req *http.Request, component string, key string) (propResult, error) {
+func (p Prop) resolveProp(context propResolutionContext) (propResult, error) {
+	if err := p.validate(context.Path); err != nil {
+		return propResult{}, err
+	}
 	if p.deferred {
-		return p.resolveDeferred(req, component, key)
+		return p.resolveDeferred(context)
 	}
-	if p.usesRememberedOnce(req, component, key) {
-		return propResult{Omit: true, Metadata: p.onceMetadata(key)}, nil
+	if p.mode == propModeOptional && !isPartialReloadForComponent(context.Request, context.Component) {
+		return propResult{Omit: true, Metadata: p.initialOmittedMetadata(context)}, nil
 	}
-	if !p.includes(req, component, key) {
+	if p.usesRememberedOnce(context) {
+		return propResult{Omit: true, Metadata: p.onceMetadata(context.Path)}, nil
+	}
+	if !p.includes(context) {
 		return propResult{Omit: true}, nil
 	}
-	return p.resolveIncluded(req, key)
+	return p.resolveIncluded(context)
 }
 
-func (p Prop) resolveDeferred(req *http.Request, component string, key string) (propResult, error) {
-	if p.usesRememberedOnce(req, component, key) {
-		return propResult{Omit: true, Metadata: p.onceMetadata(key)}, nil
-	}
-	if !isPartialReloadForComponent(req, component) {
+func (p Prop) resolveDeferred(context propResolutionContext) (propResult, error) {
+	if !isPartialReloadForComponent(context.Request, context.Component) {
 		return propResult{
 			Omit:     true,
-			Metadata: deferredPropMetadata(p.group, key),
+			Metadata: p.initialOmittedMetadata(context),
 		}, nil
 	}
-	if !partialReloadIncludesProp(req, key) {
+	if !partialPathIncluded(context) {
 		return propResult{Omit: true}, nil
 	}
-	result, err := p.resolveIncluded(req, key)
+	result, err := p.resolveIncluded(context)
 	if err != nil && p.rescue {
 		return propResult{
 			Omit:     true,
-			Metadata: rescuedPropMetadata(key),
+			Metadata: rescuedPropMetadata(context.Path),
 		}, nil
 	}
 	return result, err
 }
 
-func (p Prop) resolveIncluded(req *http.Request, key string) (propResult, error) {
-	value, err := p.resolveValue(req)
+func (p Prop) initialOmittedMetadata(context propResolutionContext) pageMetadata {
+	metadata := pageMetadata{}
+	if p.deferred && !p.usesRememberedOnce(context) {
+		metadata.merge(deferredPropMetadata(p.group, context.Path))
+	}
+	if p.merge {
+		metadata.merge(p.mergeMetadata(context.Path))
+	}
+	if p.scroll {
+		scrollMetadata := p.scrollPageMetadata(context.Request, context.Path)
+		scrollMetadata.ScrollProps = nil
+		metadata.merge(scrollMetadata)
+	}
+	if p.once {
+		metadata.merge(p.onceMetadata(context.Path))
+	}
+	return metadata
+}
+
+func (p Prop) resolveIncluded(context propResolutionContext) (propResult, error) {
+	value, err := p.resolveValue(context.Request)
 	if err != nil {
 		return propResult{}, err
 	}
 	return propResult{
 		Value:    value,
-		Metadata: p.metadata(req, key),
-		Always:   p.mode == propModeAlways,
+		Metadata: p.metadata(context),
 	}, nil
 }
 
@@ -251,39 +292,59 @@ func (p Prop) resolveValue(req *http.Request) (any, error) {
 	}
 }
 
-func (p Prop) includes(req *http.Request, component string, key string) bool {
+func (p Prop) includes(context propResolutionContext) bool {
+	if context.ParentWasResolved && isPartialReloadForComponent(context.Request, context.Component) {
+		return true
+	}
 	switch p.mode {
 	case propModeOptional:
-		return isPartialReloadForComponent(req, component) && containsString(PartialData(req), key)
+		return isPartialReloadForComponent(context.Request, context.Component) && partialPathIncluded(context)
 	case propModeAlways:
 		return true
 	case propModeLazy:
-		return !isPartialReloadForComponent(req, component) || partialReloadIncludesProp(req, key)
+		return !isPartialReloadForComponent(context.Request, context.Component) || partialPathIncluded(context)
 	default:
 		return true
 	}
 }
 
-func (p Prop) usesRememberedOnce(req *http.Request, component string, key string) bool {
+func (p Prop) usesRememberedOnce(context propResolutionContext) bool {
 	return p.once &&
-		IsInertiaRequest(req) &&
-		!isPartialReloadForComponent(req, component) &&
+		IsInertiaRequest(context.Request) &&
+		!isPartialReloadForComponent(context.Request, context.Component) &&
 		!p.fresh &&
-		containsString(ExceptOnceProps(req), p.resolvedOnceKey(key))
+		containsString(ExceptOnceProps(context.Request), p.resolvedOnceKey(context.Path))
 }
 
-func (p Prop) metadata(req *http.Request, key string) pageMetadata {
+func (p Prop) metadata(context propResolutionContext) pageMetadata {
 	metadata := pageMetadata{}
-	if p.merge {
-		metadata.merge(p.mergeMetadata(key))
+	if p.merge && partialMetadataIncludesProp(context.Request, context.Component, context.Path) {
+		metadata.merge(p.mergeMetadata(context.Path))
 	}
 	if p.scroll {
-		metadata.merge(p.scrollPageMetadata(req, key))
+		metadata.merge(p.scrollPageMetadata(context.Request, context.Path))
 	}
-	if p.once {
-		metadata.merge(p.onceMetadata(key))
+	if p.once && partialMetadataIncludesProp(context.Request, context.Component, context.Path) {
+		metadata.merge(p.onceMetadata(context.Path))
 	}
 	return metadata
+}
+
+func (p Prop) validate(path string) error {
+	reason := p.invalidReason
+	if reason == "" && p.rescue && !p.deferred {
+		reason = "Rescue requires Defer"
+	}
+	if reason == "" && len(p.matchOn) > 0 && !p.merge && !p.scroll {
+		reason = "MatchOn requires Merge or Scroll"
+	}
+	if reason == "" && p.wrapperSet && !p.scroll {
+		reason = "Wrapper requires Scroll"
+	}
+	if reason == "" {
+		return nil
+	}
+	return &PropConfigurationError{Path: path, Reason: reason}
 }
 
 func (p Prop) mergeMetadata(key string) pageMetadata {

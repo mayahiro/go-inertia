@@ -48,7 +48,8 @@ The client loads each group with a separate partial reload.
 ## Composing Modifiers
 
 Deferred props can also be marked as mergeable or once props. Merge and once
-metadata is sent when the deferred prop is actually loaded.
+metadata is sent with the initial response even though the prop value remains
+deferred. This lets the client prepare both behaviors before loading the value.
 
 ```go
 err := renderer.Render(w, req, "Users/Index", inertia.Props{
@@ -57,15 +58,25 @@ err := renderer.Render(w, req, "Users/Index", inertia.Props{
 })
 ```
 
-The first page response only includes `deferredProps`. When the client loads
-`results`, the response includes `deepMergeProps` and `matchPropsOn`. When the
-client loads `permissions`, the response includes `onceProps`.
+The first page response includes `deferredProps` plus the configured
+`deepMergeProps`, `matchPropsOn`, and `onceProps` metadata. The prop values are
+added when the client requests them.
 
 ## Partial Reload Behavior
 
 For a matching partial reload, `go-inertia` resolves a deferred prop only when
-the prop is requested by `X-Inertia-Partial-Data`, or when it is not excluded by
-`X-Inertia-Partial-Except`.
+its path satisfies `X-Inertia-Partial-Data`, when present, and is not excluded
+by `X-Inertia-Partial-Except`.
+
+Nested deferred props use full dot paths in both request and response metadata.
+
+```go
+"auth": inertia.Props{
+	"notifications": inertia.Defer(loadNotifications),
+}
+```
+
+The resulting deferred path is `auth.notifications`.
 
 If a partial reload does not request a deferred prop, the callback is not
 executed and the prop is omitted from the response.

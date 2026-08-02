@@ -9,17 +9,22 @@ type propResult struct {
 	Value    any
 	Metadata pageMetadata
 	Omit     bool
-	Always   bool
 }
 
 type propResolver interface {
-	resolveProp(req *http.Request, component string, key string) (propResult, error)
+	resolveProp(context propResolutionContext) (propResult, error)
+}
+
+type propResolutionContext struct {
+	Request           *http.Request
+	Component         string
+	Path              string
+	ParentWasResolved bool
 }
 
 type pageProps struct {
 	Props       Props
 	Metadata    pageMetadata
-	AlwaysProps map[string]bool
 	SharedProps map[string]bool
 	Component   string
 }
@@ -38,30 +43,22 @@ type pageMetadata struct {
 func newPageProps(component string) pageProps {
 	return pageProps{
 		Props:       Props{},
-		AlwaysProps: map[string]bool{},
 		SharedProps: map[string]bool{},
 		Component:   component,
 	}
 }
 
-func (p *pageProps) mergePublicProps(req *http.Request, src Props) error {
-	for key, value := range src {
-		if isReservedProp(key) {
-			continue
-		}
-		if err := p.set(req, key, value); err != nil {
-			return err
-		}
-		delete(p.SharedProps, key)
-	}
-	return nil
-}
-
 func (p *pageProps) set(req *http.Request, key string, value any) error {
+	if err := validateStaticPropTree(key, value); err != nil {
+		return err
+	}
 	p.Metadata.remove(key)
-	delete(p.AlwaysProps, key)
 
-	result, err := resolveProp(req, p.Component, key, value)
+	result, err := resolvePropTree(propResolutionContext{
+		Request:   req,
+		Component: p.Component,
+		Path:      key,
+	}, value)
 	if err != nil {
 		return err
 	}
@@ -71,22 +68,22 @@ func (p *pageProps) set(req *http.Request, key string, value any) error {
 	} else {
 		p.Props[key] = result.Value
 	}
-	if result.Always {
-		p.AlwaysProps[key] = true
-	}
 	p.Metadata.merge(result.Metadata)
 	return nil
 }
 
-func resolveProp(req *http.Request, component string, key string, value any) (propResult, error) {
+func resolveProp(context propResolutionContext, value any) (propResult, error) {
+	if prop, ok := value.(*Prop); ok && prop == nil {
+		return propResult{}, &PropConfigurationError{Path: context.Path, Reason: "prop must not be nil"}
+	}
 	if isPropFunc(value) {
-		return newProp(value).resolveProp(req, component, key)
+		return newProp(value).resolveProp(context)
 	}
 	resolver, ok := value.(propResolver)
 	if !ok {
 		return propResult{Value: value}, nil
 	}
-	return resolver.resolveProp(req, component, key)
+	return resolver.resolveProp(context)
 }
 
 func (m *pageMetadata) remove(key string) {
@@ -162,22 +159,6 @@ func (m pageMetadata) applyTo(page *Page) {
 	page.OnceProps = m.OnceProps
 }
 
-func (m *pageMetadata) filterForProps(props Props) {
-	m.MergeProps = filterExistingPropPaths(m.MergeProps, props)
-	m.PrependProps = filterExistingPropPaths(m.PrependProps, props)
-	m.DeepMergeProps = filterExistingPropPaths(m.DeepMergeProps, props)
-	m.MatchPropsOn = filterExistingPropPaths(m.MatchPropsOn, props)
-
-	for key := range m.ScrollProps {
-		if _, ok := props[key]; !ok {
-			delete(m.ScrollProps, key)
-		}
-	}
-	if len(m.ScrollProps) == 0 {
-		m.ScrollProps = nil
-	}
-}
-
 func (m *pageMetadata) filterForReset(req *http.Request) {
 	for _, key := range ResetProps(req) {
 		m.removeMerge(key)
@@ -210,27 +191,6 @@ func filterPropPaths(paths []string, key string) []string {
 		}
 	}
 	return filtered
-}
-
-func filterExistingPropPaths(paths []string, props Props) []string {
-	if len(paths) == 0 {
-		return nil
-	}
-	filtered := paths[:0]
-	for _, path := range paths {
-		if propPathExists(props, path) {
-			filtered = append(filtered, path)
-		}
-	}
-	return filtered
-}
-
-func propPathExists(props Props, path string) bool {
-	if index := strings.IndexByte(path, '.'); index >= 0 {
-		path = path[:index]
-	}
-	_, ok := props[path]
-	return ok
 }
 
 func filterExactProp(props []string, key string) []string {

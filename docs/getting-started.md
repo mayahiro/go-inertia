@@ -30,8 +30,8 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 
 ## Root Template
 
-The root template is rendered for normal browser visits. It should include
-`InertiaScript` and the element used by the client app.
+The root template is rendered for normal browser visits. Use `InertiaApp` to
+include the initial page script and the matching client mount element.
 
 ```html
 <!doctype html>
@@ -43,11 +43,30 @@ The root template is rendered for normal browser visits. It should include
     {{ .InertiaHead }}
   </head>
   <body>
-    {{ .InertiaScript }}
-    <div id="app"></div>
+    {{ .InertiaApp }}
   </body>
 </html>
 ```
+
+The default root id is `app`. To change it, configure both the server and the
+client.
+
+```go
+renderer, err := inertia.New(inertia.Config{
+	RootView:      rootView,
+	RootElementID: "inertia-app",
+})
+```
+
+```ts
+createInertiaApp({
+  id: 'inertia-app',
+  // ...
+})
+```
+
+`RootViewData` also exposes `InertiaScript`, `InertiaRoot`, and `RootElementID`
+for templates that need separate placement.
 
 ## Renderer
 
@@ -134,3 +153,9 @@ Use `Config.DefaultRenderOptions` for render options that apply to every page,
 such as Vite tags. Configure a `FlashStore` when redirects need to carry flash
 messages or validation errors to the next request. `NewMemoryFlashStore` is
 available for local development and single-process examples.
+
+For durable application sessions, adapt the existing session through
+`NewSessionFlashStore`. See [Validation and flash](validation-and-flash.md).
+
+`go-inertia` currently targets client-side rendering. Inertia SSR gateway,
+body, and head rendering are not implemented.

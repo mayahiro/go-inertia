@@ -3,6 +3,7 @@ package inertia
 import (
 	"bytes"
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"strings"
 )
@@ -60,16 +61,30 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 		return err
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(statusCode)
-	return r.rootView.Render(w, RootViewData{
+	script := inertiaScript(pageJSON, r.rootElementID)
+	root := inertiaRoot(r.rootElementID)
+	inertiaHead := options.inertiaHead
+	if options.serverHead != nil {
+		inertiaHead = appendTemplateHTML(inertiaHead, options.serverHead.HTML())
+	}
+	var body bytes.Buffer
+	if err := r.rootView.Render(&body, RootViewData{
 		Page:          page,
 		PageJSON:      pageJSON,
-		InertiaScript: inertiaScript(pageJSON),
+		InertiaScript: script,
+		InertiaRoot:   root,
+		InertiaApp:    inertiaApp(script, root),
+		RootElementID: r.rootElementID,
 		Data:          options.data,
 		ViteTags:      options.viteTags,
-		InertiaHead:   options.inertiaHead,
-	})
+		InertiaHead:   inertiaHead,
+	}); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(statusCode)
+	_, err = w.Write(body.Bytes())
+	return err
 }
 
 // RenderError renders an Inertia error page with status.
@@ -119,4 +134,14 @@ func safePageJSON(page Page, encoder JSONEncoder) (templateJS, error) {
 	body = bytes.ReplaceAll(body, []byte("\u2028"), []byte("\\u2028"))
 	body = bytes.ReplaceAll(body, []byte("\u2029"), []byte("\\u2029"))
 	return templateJS(body), nil
+}
+
+func appendTemplateHTML(current template.HTML, next template.HTML) template.HTML {
+	if current == "" {
+		return next
+	}
+	if next == "" {
+		return current
+	}
+	return template.HTML(string(current) + "\n" + string(next))
 }

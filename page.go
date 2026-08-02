@@ -12,7 +12,7 @@ type Page struct {
 	// URL is the current request URL as seen by Inertia.
 	URL string `json:"url"`
 	// Version is the current asset version.
-	Version any `json:"version,omitempty"`
+	Version any `json:"version"`
 	// EncryptHistory requests encrypted browser history state when supported by the client.
 	EncryptHistory bool `json:"encryptHistory,omitempty"`
 	// ClearHistory requests clearing browser history state when supported by the client.
@@ -37,6 +37,8 @@ type Page struct {
 	DeferredProps map[string][]string `json:"deferredProps,omitempty"`
 	// OnceProps contains once prop metadata keyed by once prop key.
 	OnceProps map[string]OncePropMetadata `json:"onceProps,omitempty"`
+	// Flash contains one-time data that is not persisted in browser history.
+	Flash Flash `json:"flash,omitempty"`
 }
 
 // OncePropMetadata describes an Inertia once prop entry in the page object.

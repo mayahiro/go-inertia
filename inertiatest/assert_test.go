@@ -51,7 +51,9 @@ func TestAssertResponseAndPage(t *testing.T) {
 		HasMergeProp("posts.data").
 		HasScrollProp("posts").
 		HasFlash("notice").
-		HasError("name")
+		FlashEqual("notice", "saved").
+		HasError("name").
+		ErrorEqual("name", "required")
 }
 
 func TestAssertPageRescuedProp(t *testing.T) {

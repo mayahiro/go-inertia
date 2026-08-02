@@ -70,7 +70,7 @@ The timestamp is serialized in `onceProps` as `expiresAt`.
 
 ## Composing Modifiers
 
-Once props can be combined with deferred, merge, optional, and lazy props.
+Once props can be combined with deferred, merge, optional, and computed props.
 
 ```go
 "permissions": inertia.Defer(loadPermissions).Once()
@@ -78,9 +78,9 @@ Once props can be combined with deferred, merge, optional, and lazy props.
 "companies": inertia.Optional(loadCompanies).Once()
 ```
 
-For deferred props, `onceProps` metadata is sent when the deferred prop is
-loaded. For optional props, a standard visit omits the prop until the client
-explicitly requests it with `only`.
+Deferred and optional props publish `onceProps` metadata on the initial response
+while omitting their values. The values are returned when the client explicitly
+requests them with `only`.
 
 ## Partial Reload Behavior
 

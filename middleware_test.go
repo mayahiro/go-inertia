@@ -31,6 +31,9 @@ func TestMiddlewareAssetVersionMismatchReturns409(t *testing.T) {
 	if got := w.Header().Get(HeaderInertiaLocation); got != "/users?page=2" {
 		t.Fatalf("unexpected inertia location: %s", got)
 	}
+	if got := w.Header().Get(HeaderInertiaVersion); got != "new" {
+		t.Fatalf("unexpected inertia version: %s", got)
+	}
 	if !store.reflashed {
 		t.Fatal("expected reflash")
 	}
@@ -93,5 +96,24 @@ func TestMiddlewareEmptyVersionCallsNext(t *testing.T) {
 	}
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("unexpected status: %d", w.Code)
+	}
+}
+
+func TestMiddlewareStringifiesNonComparableVersion(t *testing.T) {
+	renderer := newTestRenderer(t, Config{VersionProvider: StaticVersion([]int{1, 2})})
+	req := httptest.NewRequest(http.MethodGet, "/users", nil)
+	req.Header.Set(HeaderInertia, "true")
+	req.Header.Set(HeaderInertiaVersion, "old")
+	w := httptest.NewRecorder()
+
+	renderer.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		t.Fatal("next handler should not be called")
+	})).ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("unexpected status: %d", w.Code)
+	}
+	if got := w.Header().Get(HeaderInertiaVersion); got != "[1 2]" {
+		t.Fatalf("unexpected inertia version: %s", got)
 	}
 }

@@ -3,10 +3,11 @@
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, server-side shared prop merging, flash data, validation errors,
-top-level partial reload filtering, lazy props, optional props, always props,
+recursive prop resolution, dot-notation partial reload filtering, computed
+props, optional props, always props,
 deferred props, once props, merge props, composable prop modifiers, infinite
-scroll props, history flags, prefetch detection, and Precognition validation
-responses.
+scroll props, server-provided head elements, history flags, prefetch detection,
+and Precognition validation responses.
 
 ## HTML First Visits
 
@@ -20,6 +21,9 @@ mount element.
 ```
 
 The response includes `Vary: X-Inertia`.
+
+`Config.RootElementID` changes both values. Templates can use `InertiaApp` to
+emit the synchronized script and mount element together.
 
 ## Inertia JSON Visits
 
@@ -40,6 +44,7 @@ The page object supports these core fields:
 - `encryptHistory`
 - `clearHistory`
 - `preserveFragment`
+- `flash`, when one-time flash data exists
 
 It also has JSON fields for advanced prop metadata:
 
@@ -56,45 +61,93 @@ It also has JSON fields for advanced prop metadata:
 These metadata fields use the protocol shape expected by current Inertia
 clients.
 
+`version` is always present. The default provider returns an empty string when
+asset versioning is not configured.
+
 `props.errors` is always present. When there are no validation errors, it is an
 empty object.
 
 `sharedProps` lists top-level props registered through `Config.SharedProps` or
-`WithSharedProps`. Handler props and `WithProps` values are not listed there
-when they override the same key.
+`WithSharedProps`. A key remains shared metadata when a handler value overrides
+its final value, matching the Inertia v3 resolver contract.
+
+Flash data is stored in top-level `page.flash`, not `page.props.flash`. This
+allows the Inertia v3 client to dispatch flash callbacks and events without
+persisting flash data as an ordinary history prop.
 
 ## Asset Version Mismatches
 
 For GET Inertia requests, middleware compares `X-Inertia-Version` with the
-current asset version. If they differ, it returns `409 Conflict` and sets
-`X-Inertia-Location` to the current URL.
+current asset version. If they differ, it returns `409 Conflict`, sets
+`X-Inertia-Location` to the current URL, and sets `X-Inertia-Version` to the
+current version. The response version lets Inertia v3.6 and later distinguish
+an asset version change from an explicit location response and defer a hard
+reload triggered by a background request.
 
 Non-GET requests do not return an asset mismatch response directly.
 
 ## Redirects
 
 Non-GET Inertia redirects use `303 See Other`. External locations use
-`409 Conflict` with `X-Inertia-Location`.
+`409 Conflict` with `X-Inertia-Location`. Explicit location responses do not
+include `X-Inertia-Version`.
 
 `WithPreserveFragment` returns `409 Conflict` with `X-Inertia-Redirect` for
 Inertia requests.
 
 ## Partial Reloads
 
-`go-inertia` supports top-level prop filtering.
+`go-inertia` resolves string-key maps, slices, and arrays recursively. Nested
+`Optional`, `Defer`, `Merge`, `Once`, `Scroll`, and other prop modifiers use
+full dot-notation metadata paths such as `auth.notifications`.
 
 - Filtering applies only when `X-Inertia-Partial-Component` matches the rendered component.
-- `X-Inertia-Partial-Except` excludes listed top-level props.
-- `X-Inertia-Partial-Data` includes only listed top-level props when `Partial-Except` is not set.
-- `X-Inertia-Reset` removes merge metadata for listed top-level props.
+- `X-Inertia-Partial-Data` includes matching paths and their required ancestors.
+- `X-Inertia-Partial-Except` removes matching paths and descendants.
+- When both headers are present, a path must satisfy `Partial-Data` and must not match `Partial-Except`.
+- `X-Inertia-Reset` removes merge metadata for listed prop paths.
   For infinite scroll props, the matching `scrollProps` entry remains and is
   marked as reset.
 - `errors` is always included.
-- `flash` is included when flash data exists.
+- top-level `flash` is included when flash data exists and is independent of prop filtering.
 
-Plain `func(*http.Request) (any, error)` props are evaluated lazily. `Optional`
-props are only included when explicitly requested with `Partial-Data`. `Always`
-props are included even during partial reloads.
+Plain `func(*http.Request) (any, error)` props are computed when included.
+`Optional` props are only included when explicitly requested with
+`Partial-Data`. `Always` props are included even during partial reloads.
+
+Top-level dot-notation input keys are unpacked before recursive resolution.
+
+```go
+inertia.Props{
+	"auth.user": currentUser,
+	"auth.notifications": inertia.Defer(loadNotifications),
+}
+```
+
+When a callback returns a map, slice, or array, its returned children are
+resolved as part of that callback value and bypass a second partial filter.
+
+## Server-Provided Head
+
+`WithServerHead` adds escaped HTML strings to the configured head prop and to
+the initial `InertiaHead` template value. The default prop name is `head`.
+
+```go
+head, err := inertia.NewServerHead(
+	inertia.HeadTitle("Users"),
+	inertia.HeadMeta("description", "Manage users"),
+)
+if err != nil {
+	return err
+}
+
+return renderer.Render(w, req, "Users/Index", props,
+	inertia.WithServerHead(head),
+)
+```
+
+The client must enable `serverHead: true`, or use the same custom prop name as
+`Config.ServerHeadProp`. See [Server-provided head](server-head.md).
 
 ## Deferred Props
 
@@ -109,6 +162,7 @@ props are included even during partial reloads.
     "users": []
   },
   "url": "/users",
+  "version": "",
   "deferredProps": {
     "default": ["permissions"]
   }
@@ -132,6 +186,7 @@ the once key. The client reports loaded once keys with
     "plans": []
   },
   "url": "/dashboard",
+  "version": "",
   "onceProps": {
     "plans": {
       "prop": "plans"
@@ -157,6 +212,7 @@ plain merge prop appends at the root prop path.
     "items": []
   },
   "url": "/items",
+  "version": "",
   "mergeProps": ["items"]
 }
 ```
@@ -176,7 +232,7 @@ the client replaces the prop value instead of merging it.
 
 ## Composable Props
 
-`Defer`, `Merge`, `Once`, `Optional`, `Always`, and lazy function props share a
+`Defer`, `Merge`, `Once`, `Optional`, `Always`, and computed props share a
 single modifier model. Supported combinations include deferred merge props,
 deferred once props, merge once props, and optional once props.
 
@@ -202,6 +258,7 @@ the wrapped item data to append or prepend during partial reloads.
     }
   },
   "url": "/posts?page=1",
+  "version": "",
   "mergeProps": ["posts.data"],
   "scrollProps": {
     "posts": {

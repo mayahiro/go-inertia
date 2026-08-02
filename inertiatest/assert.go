@@ -196,7 +196,7 @@ func (a *PageAssertion) HasOnceProp(key string) *PageAssertion {
 // HasFlash asserts that a flash prop exists.
 func (a *PageAssertion) HasFlash(path string) *PageAssertion {
 	a.t.Helper()
-	if _, ok := lookupPath(a.page.Props, joinPath("flash", path)); !ok {
+	if _, ok := lookupPath(inertia.Props(a.page.Flash), path); !ok {
 		a.t.Fatalf("missing flash %q", path)
 	}
 	return a
@@ -205,8 +205,21 @@ func (a *PageAssertion) HasFlash(path string) *PageAssertion {
 // MissingFlash asserts that a flash prop does not exist.
 func (a *PageAssertion) MissingFlash(path string) *PageAssertion {
 	a.t.Helper()
-	if value, ok := lookupPath(a.page.Props, joinPath("flash", path)); ok {
+	if value, ok := lookupPath(inertia.Props(a.page.Flash), path); ok {
 		a.t.Fatalf("unexpected flash %q: %#v", path, value)
+	}
+	return a
+}
+
+// FlashEqual asserts that a flash value equals want.
+func (a *PageAssertion) FlashEqual(path string, want any) *PageAssertion {
+	a.t.Helper()
+	got, ok := lookupPath(inertia.Props(a.page.Flash), path)
+	if !ok {
+		a.t.Fatalf("missing flash %q", path)
+	}
+	if !reflect.DeepEqual(got, want) {
+		a.t.Fatalf("unexpected flash %q: got %#v, want %#v", path, got, want)
 	}
 	return a
 }
@@ -225,6 +238,19 @@ func (a *PageAssertion) MissingError(path string) *PageAssertion {
 	a.t.Helper()
 	if value, ok := lookupPath(a.page.Props, joinPath("errors", path)); ok {
 		a.t.Fatalf("unexpected error %q: %#v", path, value)
+	}
+	return a
+}
+
+// ErrorEqual asserts that a validation error value equals want.
+func (a *PageAssertion) ErrorEqual(path string, want any) *PageAssertion {
+	a.t.Helper()
+	got, ok := lookupPath(a.page.Props, joinPath("errors", path))
+	if !ok {
+		a.t.Fatalf("missing error %q", path)
+	}
+	if !reflect.DeepEqual(got, want) {
+		a.t.Fatalf("unexpected error %q: got %#v, want %#v", path, got, want)
 	}
 	return a
 }

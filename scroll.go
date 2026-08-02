@@ -45,13 +45,21 @@ func ScrollPage(paginator ScrollPaginator, wrapper ...string) ScrollProp {
 		path = wrapper[0]
 	}
 	if isNilScrollPaginator(paginator) {
-		return Scroll(func(_ *http.Request) (any, error) {
+		prop := Scroll(func(_ *http.Request) (any, error) {
 			return nil, ErrInvalidScrollPaginator
 		}, ScrollMetadata{}).Wrapper(path)
+		if len(wrapper) > 1 {
+			prop.invalidReason = "ScrollPage accepts at most one wrapper"
+		}
+		return prop
 	}
-	return Scroll(Props{
+	prop := Scroll(Props{
 		path: paginator.ScrollItems(),
 	}, paginator.ScrollMetadata()).Wrapper(path)
+	if len(wrapper) > 1 {
+		prop.invalidReason = "ScrollPage accepts at most one wrapper"
+	}
+	return prop
 }
 
 func isNilScrollPaginator(paginator ScrollPaginator) bool {

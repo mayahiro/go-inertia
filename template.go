@@ -23,6 +23,12 @@ type RootViewData struct {
 	PageJSON template.JS
 	// InertiaScript is the script tag containing PageJSON.
 	InertiaScript template.HTML
+	// InertiaRoot is the empty root element used to mount the client application.
+	InertiaRoot template.HTML
+	// InertiaApp contains InertiaScript followed by InertiaRoot.
+	InertiaApp template.HTML
+	// RootElementID is the configured client application root id.
+	RootElementID string
 	// InertiaHead is HTML rendered in the document head.
 	InertiaHead template.HTML
 	// ViteTags contains script and stylesheet tags for Vite assets.
@@ -73,6 +79,16 @@ func (v *TemplateRootView) Render(w io.Writer, data RootViewData) error {
 	return v.template.ExecuteTemplate(w, v.name, data)
 }
 
-func inertiaScript(pageJSON template.JS) template.HTML {
-	return template.HTML(`<script data-page="app" type="application/json">` + string(pageJSON) + `</script>`)
+func inertiaScript(pageJSON template.JS, rootElementID string) template.HTML {
+	id := template.HTMLEscapeString(rootElementID)
+	return template.HTML(`<script data-page="` + id + `" type="application/json">` + string(pageJSON) + `</script>`)
+}
+
+func inertiaRoot(rootElementID string) template.HTML {
+	id := template.HTMLEscapeString(rootElementID)
+	return template.HTML(`<div id="` + id + `"></div>`)
+}
+
+func inertiaApp(script template.HTML, root template.HTML) template.HTML {
+	return template.HTML(string(script) + "\n" + string(root))
 }

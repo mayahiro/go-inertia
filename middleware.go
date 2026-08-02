@@ -13,7 +13,8 @@ func (r *Renderer) Middleware(next http.Handler) http.Handler {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			if current != nil && current != "" && req.Header.Get(HeaderInertiaVersion) != stringifyVersion(current) {
+			currentVersion := stringifyVersion(current)
+			if currentVersion != "" && req.Header.Get(HeaderInertiaVersion) != currentVersion {
 				if r.flashStore != nil {
 					if err := r.flashStore.Reflash(w, req); err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -21,6 +22,7 @@ func (r *Renderer) Middleware(next http.Handler) http.Handler {
 					}
 				}
 				w.Header().Set(HeaderInertiaLocation, r.urlResolver.URL(req))
+				w.Header().Set(HeaderInertiaVersion, currentVersion)
 				w.WriteHeader(http.StatusConflict)
 				return
 			}

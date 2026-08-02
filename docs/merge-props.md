@@ -92,7 +92,7 @@ The page object includes:
 
 This callback is resolved when the page is rendered. It is not the same as a
 deferred prop. During matching partial reloads, the callback only runs when the
-prop is included by `only` or not excluded by `except`.
+prop satisfies the active `only` filter and is not excluded by `except`.
 
 ## Composing Modifiers
 
