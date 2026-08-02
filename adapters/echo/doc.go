@@ -2,7 +2,8 @@
 //
 // Create an Adapter with New, register Adapter.Middleware with Echo, and call
 // Adapter.Render, Adapter.RenderError, Adapter.Redirect, Adapter.Back, or
-// Adapter.Location from Echo handlers.
+// Adapter.Location from Echo handlers. Adapter.ErrorHandler can be installed as
+// Echo's centralized HTTP error handler.
 //
 // The adapter is a thin wrapper around inertia.Renderer. Protocol behavior stays
 // in the core package.

@@ -112,7 +112,7 @@ func TestAdapterRedirectReturns303ForNonGETInertiaRequest(t *testing.T) {
 }
 
 func TestAdapterLocationReturns409ForInertiaRequest(t *testing.T) {
-	adapter := New(newRenderer(t, inertia.Config{}))
+	adapter := New(newRenderer(t, inertia.Config{VersionProvider: inertia.StaticVersion("current")}))
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/external", nil)
 	req.Header.Set(inertia.HeaderInertia, "true")
@@ -129,6 +129,9 @@ func TestAdapterLocationReturns409ForInertiaRequest(t *testing.T) {
 	}
 	if got := w.Header().Get(inertia.HeaderInertiaLocation); got != "https://example.com" {
 		t.Fatalf("unexpected location: %s", got)
+	}
+	if got := w.Header().Get(inertia.HeaderInertiaVersion); got != "" {
+		t.Fatalf("explicit location should not include inertia version: %s", got)
 	}
 }
 
