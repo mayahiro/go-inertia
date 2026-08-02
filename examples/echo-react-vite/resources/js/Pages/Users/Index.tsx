@@ -17,7 +17,7 @@ type UserForm = {
 }
 
 export default function UsersIndex({ users }: UsersIndexProps) {
-  const { flash } = usePage<ExamplePageProps>().props
+  const { flash } = usePage<ExamplePageProps>()
   const form = useForm<UserForm>({
     name: '',
     email: '',

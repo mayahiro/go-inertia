@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	echo "github.com/labstack/echo/v5"
@@ -34,11 +35,16 @@ type dashboardPageProps struct {
 
 func (p dashboardPageProps) Props() inertia.Props {
 	return inertia.Props{
-		"stats": p.Stats,
-		"serverTime": inertia.Defer(func(req *http.Request) (any, error) {
-			return time.Now().Format(time.RFC3339), nil
-		}).Once(),
+		"stats":      p.Stats,
+		"serverTime": inertia.Defer(loadServerTime).Rescue().Once(),
 	}
+}
+
+func loadServerTime(req *http.Request) (any, error) {
+	if req.URL.Query().Get("failServerTime") == "1" {
+		return nil, errors.New("demonstration deferred prop failure")
+	}
+	return time.Now().Format(time.RFC3339), nil
 }
 
 type usersIndexPageProps struct {
@@ -94,8 +100,18 @@ func main() {
 		panic(err)
 	}
 
+	dashboardHead, err := pageHead("Dashboard", "Dashboard overview")
+	if err != nil {
+		panic(err)
+	}
+	usersHead, err := pageHead("Users", "Manage users")
+	if err != nil {
+		panic(err)
+	}
+
 	renderer, err := inertia.New(inertia.Config{
 		RootView:        rootView,
+		RootElementID:   "inertia-app",
 		VersionProvider: vite.VersionProvider(),
 		FlashStore:      inertia.NewMemoryFlashStore(),
 		SharedProps: inertia.SharedPropsFunc(func(req *http.Request) (inertia.Props, error) {
@@ -113,24 +129,45 @@ func main() {
 
 	app := inertiaecho.New(renderer)
 	e := echo.New()
+	e.HTTPErrorHandler = app.ErrorHandler(inertiaecho.ErrorHandlerConfig{
+		Pages: map[int]string{
+			http.StatusNotFound: "Errors/NotFound",
+		},
+		DefaultComponent: "Errors/Error",
+		Props: func(c *echo.Context, err error, status int) (inertia.Props, error) {
+			return inertia.Props{"status": status}, nil
+		},
+		RenderOptions: func(c *echo.Context, err error, status int) ([]inertia.RenderOption, error) {
+			title := strconv.Itoa(status) + " " + http.StatusText(status)
+			head, headErr := pageHead(title, "The request could not be completed")
+			return []inertia.RenderOption{inertia.WithServerHead(head)}, headErr
+		},
+	})
 	e.Static("/build", "public/build")
 	e.Use(app.Middleware)
 
 	users := seedUsers()
+	var usersMu sync.RWMutex
 
 	e.GET("/", func(c *echo.Context) error {
+		usersMu.RLock()
+		userCount := len(users)
+		usersMu.RUnlock()
 		return app.Render(c, "Dashboard", dashboardPageProps{
 			Stats: dashboardStats{
-				Users:   len(users),
+				Users:   userCount,
 				Version: "local",
 			},
-		}.Props())
+		}.Props(), inertia.WithServerHead(dashboardHead))
 	})
 
 	e.GET("/users", func(c *echo.Context) error {
+		usersMu.RLock()
+		page := paginateUsers(c.Request(), users)
+		usersMu.RUnlock()
 		return app.Render(c, "Users/Index", usersIndexPageProps{
-			Users: paginateUsers(c.Request(), users),
-		}.Props())
+			Users: page,
+		}.Props(), inertia.WithServerHead(usersHead))
 	})
 
 	e.POST("/users", func(c *echo.Context) error {
@@ -141,19 +178,28 @@ func main() {
 		if input.Name == "" || input.Email == "" {
 			return app.Back(c, inertia.WithValidationErrors(requiredErrors(input.Name, input.Email)))
 		}
+		usersMu.Lock()
 		users = prependUser(users, input)
+		usersMu.Unlock()
 		return app.Redirect(c, "/users", inertia.WithFlash(inertia.Flash{
 			"success": "User created",
 		}))
 	})
 
-	e.RouteNotFound("/*", func(c *echo.Context) error {
-		return app.RenderError(c, "Errors/NotFound", inertia.Props{}, http.StatusNotFound)
+	e.GET("/demo/error", func(c *echo.Context) error {
+		return errors.New("demonstration error")
 	})
 
 	if err := e.Start(serverAddress()); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		e.Logger.Error("server error", "error", err)
 	}
+}
+
+func pageHead(title string, description string) (inertia.ServerHead, error) {
+	return inertia.NewServerHead(
+		inertia.HeadTitle(title+" | Go Inertia Admin"),
+		inertia.HeadMeta("description", description),
+	)
 }
 
 func seedUsers() []user {

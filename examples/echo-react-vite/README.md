@@ -15,12 +15,17 @@ It demonstrates:
 - shared props
 - `Always` shared props
 - typed Go page props converted to `inertia.Props`
-- composed `Defer(...).Once()` props
+- composed `Defer(...).Rescue().Once()` props with React fallback and rescue UI
+- dynamic partial reload polling with React `usePoll`
 - infinite scroll props with the React `InfiniteScroll` component
 - form submission with Inertia `useForm`
 - flash messages
 - validation errors flashed through `NewMemoryFlashStore`
-- a 404 fallback route rendered with the Echo adapter `RenderError` helper
+- top-level Inertia v3 flash typing
+- structured server-provided title and meta elements
+- a custom root element id shared by the Go renderer and React client
+- React automatic bootstrap with StrictMode
+- centralized 404 and 500 pages through the Echo adapter error handler
 
 The Users page intentionally sends `reset: ["users"]` after a successful create
 so the infinite scroll list is rebuilt and the newly created user appears on
@@ -29,12 +34,24 @@ list, omit that `reset` option when the existing scroll state should remain in
 place, or update the current list with Inertia client-side prop helpers.
 
 `NewMemoryFlashStore` is intended for local development and single-process
-examples. Production or clustered applications should implement `FlashStore`
-with a real session library, Redis, a database, or another shared backend.
+examples. Production or clustered applications can adapt an existing durable
+session through `NewSessionFlashStore`, or implement `FlashStore` directly for
+a shared backend.
 
-The Go module uses local `replace` directives for `go-inertia` and the Echo
-adapter, so the example runs against this checkout instead of a published
-module tag.
+The Dashboard polls only its `stats` prop every 10 seconds with `mode: "rest"`.
+Its deferred server time combines `Rescue` and `Once`, so the client can show a
+dedicated rescue state if loading fails and avoid loading the value again after
+it succeeds. Open `/?failServerTime=1` to exercise the rescue state.
+
+Visit an undefined path to see the mapped 404 page, or `/demo/error` to exercise
+the default 500 page. Both receive structured server-provided head elements.
+
+The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.6.1. The example
+uses client-side rendering and does not configure Inertia SSR.
+
+The Go module declares `v0.4.0` for `go-inertia` and the Echo adapter. Local
+`replace` directives make the example run against this checkout instead of a
+published module tag.
 
 ## Requirements
 
