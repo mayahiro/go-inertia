@@ -70,6 +70,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - structured server-provided head elements
 - configurable client root element id and root template helpers
 - Echo v5 adapter
+- configurable Echo v5 centralized error handler
 - endpoint testing helpers
 
 ## Integration Notes

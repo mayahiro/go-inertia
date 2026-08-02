@@ -11,7 +11,8 @@ The core package does not import Echo.
 ## Requirements
 
 - Go 1.25.0 or newer
-- Echo v5
+- Echo v5.3.1 or newer
+- go-inertia v0.4.0
 
 ## Installation
 
@@ -53,6 +54,15 @@ func main() {
 
 	app := inertiaecho.New(renderer)
 	e := echo.New()
+	e.HTTPErrorHandler = app.ErrorHandler(inertiaecho.ErrorHandlerConfig{
+		Pages: map[int]string{
+			http.StatusNotFound: "Errors/NotFound",
+		},
+		DefaultComponent: "Errors/Error",
+		Props: func(c *echo.Context, err error, status int) (inertia.Props, error) {
+			return inertia.Props{"status": status}, nil
+		},
+	})
 	e.Use(app.Middleware)
 
 	e.GET("/", func(c *echo.Context) error {
@@ -65,10 +75,6 @@ func main() {
 		return app.Redirect(c, "/users", inertia.WithFlash(inertia.Flash{
 			"success": "User created",
 		}))
-	})
-
-	e.RouteNotFound("/*", func(c *echo.Context) error {
-		return app.RenderError(c, "Errors/NotFound", inertia.Props{}, http.StatusNotFound)
 	})
 
 	if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed {
@@ -92,20 +98,54 @@ Use `RenderError` for status-specific error pages, or pass render options such
 as `inertia.WithRenderStatus` through `Render` when a page needs non-default
 response behavior.
 
-## 404 Fallback
+## Error Handler
 
-Routing is an application concern. Use Echo's `RouteNotFound` when an undefined
-path should render an Inertia 404 page.
+`Adapter.ErrorHandler` maps Echo errors to Inertia components and can be
+installed as Echo's centralized handler.
 
 ```go
-e.RouteNotFound("/*", func(c *echo.Context) error {
-	return app.RenderError(c, "Errors/NotFound", inertia.Props{}, http.StatusNotFound)
+e.HTTPErrorHandler = app.ErrorHandler(inertiaecho.ErrorHandlerConfig{
+	Pages: map[int]string{
+		http.StatusNotFound: "Errors/NotFound",
+		http.StatusForbidden: "Errors/Forbidden",
+	},
+	DefaultComponent: "Errors/Error",
+	Props: func(c *echo.Context, err error, status int) (inertia.Props, error) {
+		return inertia.Props{"status": status}, nil
+	},
 })
 ```
 
-The adapter does not automatically convert every Echo 404 into an Inertia
-response. API routes, static files, and browser pages often need different
-error behavior.
+The default predicate renders Inertia requests and browser requests whose
+`Accept` header explicitly includes `text/html` or `application/xhtml+xml`.
+`HEAD`, wildcard-only, and non-HTML requests use the fallback handler, which
+defaults to Echo's JSON error handler. This keeps API and static requests from
+receiving an Inertia page unless they explicitly accept HTML. Responses using
+the error handler vary on `Accept` and `X-Inertia`.
+
+Override `ShouldRender` when route groups need a different policy, or set a
+custom `Fallback`. `Props` can derive safe public values from the original
+error. Shared props configured on the core renderer are still applied.
+Custom policies can call `DefaultErrorRenderPredicate` to retain the default
+content-negotiation behavior while adding application-specific conditions.
+Echo's default fallback does not log errors, so use logging middleware or a
+custom fallback when centralized logging is required.
+
+Use `RenderOptions` for per-error render settings such as server-provided head
+elements.
+
+```go
+RenderOptions: func(c *echo.Context, err error, status int) ([]inertia.RenderOption, error) {
+	head, buildErr := inertia.NewServerHead(
+		inertia.HeadTitle(http.StatusText(status)),
+	)
+	return []inertia.RenderOption{inertia.WithServerHead(head)}, buildErr
+},
+```
+
+If prop creation, render-option creation, or rendering fails, the configured
+fallback receives the original and generated errors. Responses already
+committed by an Echo handler are left unchanged.
 
 ## Echo v4
 
