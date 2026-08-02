@@ -47,6 +47,33 @@ func TestCreatedUserAppearsOnFirstPage(t *testing.T) {
 	}
 }
 
+func TestPageHeadEscapesDynamicValues(t *testing.T) {
+	head, err := pageHead("<Users>", `Manage "users"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	elements := head.Elements()
+	if len(elements) != 2 {
+		t.Fatalf("unexpected head elements: %#v", elements)
+	}
+	joined := strings.Join(elements, "")
+	if !strings.Contains(joined, "&lt;Users&gt;") || !strings.Contains(joined, "&#34;users&#34;") {
+		t.Fatalf("head values were not escaped: %s", joined)
+	}
+	if !strings.Contains(joined, "data-inertia") {
+		t.Fatalf("head elements need stable keys: %s", joined)
+	}
+}
+
+func TestLoadServerTimeCanDemonstrateRescue(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/?failServerTime=1", nil)
+
+	if _, err := loadServerTime(req); err == nil {
+		t.Fatal("expected demonstration deferred prop failure")
+	}
+}
+
 func bindCreateUserContext(body string, contentType string) (createUserInput, error) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(body))

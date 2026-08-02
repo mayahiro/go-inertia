@@ -1,4 +1,4 @@
-import { Deferred } from '@inertiajs/react'
+import { Deferred, usePoll } from '@inertiajs/react'
 import Layout from './Layout'
 
 type DashboardProps = {
@@ -10,6 +10,8 @@ type DashboardProps = {
 }
 
 export default function Dashboard({ stats, serverTime }: DashboardProps) {
+  usePoll(10_000, { only: ['stats'] }, { mode: 'rest' })
+
   return (
     <Layout>
       <div className="grid">
@@ -21,7 +23,11 @@ export default function Dashboard({ stats, serverTime }: DashboardProps) {
           <span>Library</span>
           <strong>{stats.version}</strong>
         </div>
-        <Deferred data="serverTime" fallback={<div className="stat"><span>Server time</span><strong>Loading</strong></div>}>
+        <Deferred
+          data="serverTime"
+          fallback={<div className="stat"><span>Server time</span><strong>Loading</strong></div>}
+          rescue={<div className="stat"><span>Server time</span><strong>Unavailable</strong></div>}
+        >
           <div className="stat">
             <span>Server time</span>
             <strong>{serverTime}</strong>

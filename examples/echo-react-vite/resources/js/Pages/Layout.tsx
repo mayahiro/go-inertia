@@ -12,6 +12,7 @@ export default function Layout({ children }: PropsWithChildren) {
         <nav className="nav">
           <Link href="/">Dashboard</Link>
           <Link href="/users">Users</Link>
+          <Link href="/demo/error">Error demo</Link>
         </nav>
       </header>
       <main className="main">{children}</main>
