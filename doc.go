@@ -6,6 +6,6 @@
 // pages.
 //
 // Framework adapters wrap Renderer instead of reimplementing protocol behavior.
-// Flash data and validation errors are exposed through FlashStore; the package
-// does not include a production session store.
+// Flash data and validation errors are exposed through FlashStore. Use
+// NewSessionFlashStore to bridge an application-managed durable session.
 package inertia

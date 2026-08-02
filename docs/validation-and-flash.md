@@ -16,10 +16,10 @@ type FlashStore interface {
 }
 ```
 
-Production applications should implement `FlashStore` with their session
-library of choice, Redis, a database, or another shared backend. The core
-package does not include Redis, database, or framework-specific session store
-implementations.
+Production applications can bridge an existing durable session with
+`NewSessionFlashStore`, or implement `FlashStore` directly for Redis, a
+database, or another shared backend. The core package does not add a dependency
+on a particular session library.
 
 ## MemoryFlashStore
 
@@ -40,14 +40,45 @@ restarts, or production session policies. For example, if a POST request stores
 validation errors on instance A and the redirected GET request reaches instance
 B, instance B cannot read process-local flash data from instance A.
 
-## Configure the Renderer
+## SessionFlashStore
+
+`SessionFlashStore` serializes the complete `FlashData` value into an
+application-managed session. Adapt the session package already used by the
+application to this minimal interface.
 
 ```go
+type FlashSession interface {
+	Get(key string) ([]byte, bool, error)
+	Set(key string, value []byte) error
+	Delete(key string) error
+}
+```
+
+Resolve the session attached to each request and configure the renderer.
+
+```go
+flashStore, err := inertia.NewSessionFlashStore(inertia.SessionFlashStoreConfig{
+	Session: inertia.FlashSessionFunc(func(req *http.Request) (inertia.FlashSession, error) {
+		return sessionFromRequest(req), nil
+	}),
+	Key: "inertia.flash",
+})
+if err != nil {
+	return err
+}
+
 renderer, err := inertia.New(inertia.Config{
 	RootView:   rootView,
 	FlashStore: flashStore,
 })
 ```
+
+The session implementation must persist `Set` and `Delete` mutations after the
+request finishes. `Pull` deletes data only after successful decoding. `Reflash`
+does not mutate the session because version-mismatch middleware runs before
+`Pull`, so the serialized value is still available for the retried request.
+
+The default key is `go-inertia.flash`.
 
 ## Custom FlashStore
 
@@ -110,7 +141,8 @@ return renderer.Redirect(w, req, "/users", inertia.WithFlash(inertia.Flash{
 }))
 ```
 
-Flash data is sent in the `flash` prop on the next render.
+Flash data is sent in top-level `page.flash` on the next render. It is not
+placed in `page.props.flash`.
 
 ## Validation Errors
 

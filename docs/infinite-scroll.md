@@ -135,9 +135,10 @@ The page object includes:
 "feed": inertia.Once(loadFeed).Scroll(metadata).MatchOn("data.id")
 ```
 
-For deferred scroll props, the initial response includes `deferredProps` only.
-When the client loads the prop through a partial reload, the response includes
-the prop value, `mergeProps`, and `scrollProps`.
+For deferred scroll props, the initial response includes `deferredProps` and
+merge metadata while omitting the value and pagination-specific `scrollProps`.
+When the client loads the prop through a partial reload, the response also
+includes the prop value and `scrollProps`.
 
 For once scroll props, the first response includes the prop value, `onceProps`,
 `mergeProps`, and `scrollProps`. Later remembered once visits follow normal once

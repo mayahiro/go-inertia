@@ -42,9 +42,8 @@ func TestMemoryFlashStoreStoresAndPullsOnce(t *testing.T) {
 	}
 
 	page := decodePage(t, firstW)
-	flash, ok := page.Props["flash"].(map[string]any)
-	if !ok || flash["success"] != "created" {
-		t.Fatalf("unexpected flash: %#v", page.Props["flash"])
+	if page.Flash["success"] != "created" {
+		t.Fatalf("unexpected flash: %#v", page.Flash)
 	}
 	errors, ok := page.Props["errors"].(map[string]any)
 	if !ok || errors["name"] != "required" {
@@ -61,8 +60,8 @@ func TestMemoryFlashStoreStoresAndPullsOnce(t *testing.T) {
 	}
 
 	page = decodePage(t, secondW)
-	if _, ok := page.Props["flash"]; ok {
-		t.Fatalf("flash should only be pulled once: %#v", page.Props["flash"])
+	if len(page.Flash) > 0 {
+		t.Fatalf("flash should only be pulled once: %#v", page.Flash)
 	}
 	errors, ok = page.Props["errors"].(map[string]any)
 	if !ok || len(errors) != 0 {

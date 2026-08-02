@@ -38,9 +38,13 @@ inertiatest.AssertResponse(t, w).
 	HasDeferredProp("default", "permissions").
 	HasMergeProp("posts.data").
 	HasScrollProp("posts").
-	HasFlash("notice").
-	HasError("email")
+	FlashEqual("notice", "Saved").
+	ErrorEqual("email", "Email is required")
 ```
+
+`HasFlash` and `MissingFlash` inspect top-level `page.flash`.
+`FlashEqual` also checks its value. `HasError`, `MissingError`, and `ErrorEqual`
+inspect `page.props.errors`.
 
 Nested prop paths use dot notation.
 

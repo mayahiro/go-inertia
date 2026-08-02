@@ -107,7 +107,7 @@ func TestRedirectStatusOverride(t *testing.T) {
 }
 
 func TestLocationInertiaRequestUses409(t *testing.T) {
-	renderer := newTestRenderer(t, Config{})
+	renderer := newTestRenderer(t, Config{VersionProvider: StaticVersion("current")})
 	req := httptest.NewRequest("GET", "/external", nil)
 	req.Header.Set(HeaderInertia, "true")
 	w := httptest.NewRecorder()
@@ -122,6 +122,9 @@ func TestLocationInertiaRequestUses409(t *testing.T) {
 	}
 	if got := w.Header().Get(HeaderInertiaLocation); got != "https://example.com" {
 		t.Fatalf("unexpected location: %s", got)
+	}
+	if got := w.Header().Get(HeaderInertiaVersion); got != "" {
+		t.Fatalf("explicit location should not include inertia version: %s", got)
 	}
 }
 

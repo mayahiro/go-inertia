@@ -13,6 +13,7 @@ type renderOptions struct {
 	preserveFragment bool
 	encryptHistory   bool
 	clearHistory     bool
+	serverHead       *ServerHead
 }
 
 // WithViewData adds extra data for the RootView template.
@@ -26,6 +27,14 @@ func WithViewData(data map[string]any) RenderOption {
 func WithInertiaHead(head template.HTML) RenderOption {
 	return func(opts *renderOptions) {
 		opts.inertiaHead = head
+	}
+}
+
+// WithServerHead adds safe server-provided head elements to the page prop and initial HTML.
+func WithServerHead(head ServerHead) RenderOption {
+	return func(opts *renderOptions) {
+		cloned := head.clone()
+		opts.serverHead = &cloned
 	}
 }
 

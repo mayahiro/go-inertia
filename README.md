@@ -14,6 +14,9 @@ The documentation and example application target Inertia.js 3.x client
 packages. `go-inertia` implements the protocol pieces listed below, but it is
 not a complete replacement for the official Laravel adapter.
 
+The renderer targets client-side rendered Inertia applications. Inertia SSR
+gateway, body, and head rendering are not implemented.
+
 ## Package Layout
 
 - `github.com/mayahiro/go-inertia` is the framework-independent core package.
@@ -50,8 +53,9 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - component name transformation and existence checks
 - flash data and validation error interfaces
 - single-process in-memory flash store
-- top-level partial reload filtering
-- lazy, optional, and always props
+- durable session flash bridge
+- recursive nested props and dot-notation partial reload filtering
+- computed, optional, and always props
 - deferred props and `rescuedProps` metadata
 - once props
 - merge, prepend, and deep merge props
@@ -63,6 +67,8 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - prefetch request detection
 - Vite manifest, imported chunk, and dev-server tag generation
 - default render options
+- structured server-provided head elements
+- configurable client root element id and root template helpers
 - Echo v5 adapter
 - endpoint testing helpers
 
@@ -71,7 +77,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - Register `Renderer.Middleware` or the framework adapter middleware before routes that render Inertia pages.
 - Values in `Props`, shared props, flash data, and validation errors are sent to the browser. Do not put secrets in them.
 - For larger pages, define page-specific Go structs and convert them to `inertia.Props` at the render boundary. This keeps the server/frontend contract easier to review.
-- `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production and clustered applications should implement `FlashStore` with their session store, Redis, a database, or another shared backend.
+- `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production and clustered applications can connect an existing durable session through `NewSessionFlashStore`, or implement `FlashStore` directly for a shared backend.
 - `go build` builds Go code only. Templates and Vite assets are deployed as files unless your application embeds them.
 
 ## Core Example
@@ -127,11 +133,46 @@ func main() {
     {{ .InertiaHead }}
   </head>
   <body>
-    {{ .InertiaScript }}
-    <div id="app"></div>
+    {{ .InertiaApp }}
   </body>
 </html>
 ```
+
+`InertiaApp` keeps the initial page script and mount element synchronized with
+`Config.RootElementID`. Set the same `id` in `createInertiaApp` when using a
+value other than `app`.
+
+## Server-Provided Head Elements
+
+Build escaped head elements and pass them through `WithServerHead`. They are
+rendered into the initial document and sent in `page.props.head` for subsequent
+client navigations.
+
+```go
+head, err := inertia.NewServerHead(
+	inertia.HeadTitle("Users"),
+	inertia.HeadMeta("description", "Manage users"),
+)
+if err != nil {
+	return err
+}
+
+return renderer.Render(w, req, "Users/Index", props,
+	inertia.WithServerHead(head),
+)
+```
+
+Enable the matching Inertia v3 client option.
+
+```ts
+createInertiaApp({
+  serverHead: true,
+  // ...
+})
+```
+
+See [Server-provided head elements](docs/server-head.md) for custom prop names,
+stable keys, and trusted raw HTML.
 
 ## Echo Example
 
@@ -251,17 +292,27 @@ return renderer.Back(w, req, inertia.WithValidationErrors(inertia.ValidationErro
 Inertia preserves component state after non-GET requests, so applications
 usually do not need to send old input back through server props.
 
-## Lazy, Optional, and Always Props
+## Computed, Optional, and Always Props
 
-Plain `func(*http.Request) (any, error)` props are evaluated lazily. During a
+Plain `func(*http.Request) (any, error)` props are evaluated when included. During a
 matching partial reload, the callback only runs when the prop is included by
-`only` or not excluded by `except`.
+the active `only` filter and not excluded by `except`.
 
 ```go
 "companies": func(req *http.Request) (any, error) {
 	return loadCompanies(req.Context())
 }
 ```
+
+Use `Computed` when an explicit wrapper is clearer.
+
+```go
+"companies": inertia.Computed(loadCompanies)
+```
+
+`Lazy` remains as a deprecated alias for `Computed`. It is not the removed
+Inertia v3 `LazyProp`; use `Optional` for props that are only returned when
+explicitly requested.
 
 Use `Optional` for props that should only be sent when explicitly requested with
 the client `only` option.
@@ -349,7 +400,7 @@ Use `DeepMerge` when the whole prop should be deeply merged.
 
 ## Composable Prop Modifiers
 
-`Defer`, `Merge`, `Once`, `Optional`, `Always`, and lazy props share the same
+`Defer`, `Merge`, `Once`, `Optional`, `Always`, and computed props share the same
 modifier model. Combine them when the Inertia protocol supports the result.
 
 ```go
@@ -445,7 +496,8 @@ React + Vite + Echo example.
 - [Echo adapter](docs/echo.md)
 - [Vite](docs/vite.md)
 - [Validation and flash](docs/validation-and-flash.md)
-- [Partial reloads and lazy props](docs/partial-reloads.md)
+- [Server-provided head elements](docs/server-head.md)
+- [Partial reloads and computed props](docs/partial-reloads.md)
 - [Precognition](docs/precognition.md)
 - [History flags](docs/history.md)
 - [File uploads](docs/file-uploads.md)
@@ -457,10 +509,10 @@ React + Vite + Echo example.
 
 ## Not Yet Covered by Public Helpers
 
-Some Inertia workflows are not covered by public helpers yet.
+Some Inertia workflows are outside the current public API.
 
-- server-side rendering
-- production-ready session store
+- server-side rendering, including an SSR gateway, SSR body, and SSR head
+- concrete Redis, database, and framework-specific session integrations
 - Echo v4 adapter
 - adapters for frameworks other than Echo v5
 - CLI scaffolding

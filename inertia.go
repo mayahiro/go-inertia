@@ -2,6 +2,7 @@ package inertia
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 )
 
@@ -16,7 +17,37 @@ var (
 	ErrComponentNotFound = errors.New("inertia: component not found")
 	// ErrInvalidScrollPaginator is returned when ScrollPage receives a nil paginator.
 	ErrInvalidScrollPaginator = errors.New("inertia: scroll paginator is nil")
+	// ErrInvalidPropConfiguration is returned for a modifier combination that has no valid protocol meaning.
+	ErrInvalidPropConfiguration = errors.New("inertia: invalid prop configuration")
+	// ErrInvalidRootElementID is returned when Config.RootElementID is not safe for the Inertia DOM selectors.
+	ErrInvalidRootElementID = errors.New("inertia: invalid root element id")
+	// ErrInvalidServerHeadProp is returned when Config.ServerHeadProp is not a valid top-level prop name.
+	ErrInvalidServerHeadProp = errors.New("inertia: invalid server head prop")
+	// ErrInvalidHeadElement is returned when a server head element cannot be generated safely.
+	ErrInvalidHeadElement = errors.New("inertia: invalid head element")
+	// ErrMissingFlashSessionResolver is returned when SessionFlashStore has no session resolver.
+	ErrMissingFlashSessionResolver = errors.New("inertia: missing flash session resolver")
+	// ErrMissingFlashSession is returned when a resolver does not return a session.
+	ErrMissingFlashSession = errors.New("inertia: missing flash session")
 )
+
+// PropConfigurationError describes an invalid prop modifier combination.
+type PropConfigurationError struct {
+	// Path is the dot-notation path of the invalid prop.
+	Path string
+	// Reason explains why the modifier combination is invalid.
+	Reason string
+}
+
+// Error returns the invalid prop configuration message.
+func (e *PropConfigurationError) Error() string {
+	return fmt.Sprintf("%s: %s: %s", ErrInvalidPropConfiguration, e.Path, e.Reason)
+}
+
+// Unwrap makes PropConfigurationError match ErrInvalidPropConfiguration.
+func (e *PropConfigurationError) Unwrap() error {
+	return ErrInvalidPropConfiguration
+}
 
 // Renderer renders Inertia pages, handles protocol middleware, and creates Inertia redirects.
 type Renderer struct {
@@ -29,6 +60,8 @@ type Renderer struct {
 	renderOptions        []RenderOption
 	componentTransformer ComponentNameTransformer
 	componentChecker     ComponentExistenceChecker
+	rootElementID        string
+	serverHeadProp       string
 }
 
 // Config configures a Renderer.
@@ -51,12 +84,34 @@ type Config struct {
 	ComponentNameTransformer ComponentNameTransformer
 	// ComponentExistenceChecker checks transformed component names before rendering.
 	ComponentExistenceChecker ComponentExistenceChecker
+	// RootElementID is the DOM id and data-page value used to mount the client application.
+	// The default is "app".
+	RootElementID string
+	// ServerHeadProp is the page prop read by the client serverHead option.
+	// The default is "head".
+	ServerHeadProp string
 }
 
 // New creates a Renderer from config.
 func New(config Config) (*Renderer, error) {
 	if config.RootView == nil {
 		return nil, ErrMissingRootView
+	}
+
+	rootElementID := config.RootElementID
+	if rootElementID == "" {
+		rootElementID = "app"
+	}
+	if !validRootElementID(rootElementID) {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidRootElementID, rootElementID)
+	}
+
+	serverHeadProp := config.ServerHeadProp
+	if serverHeadProp == "" {
+		serverHeadProp = "head"
+	}
+	if !validServerHeadProp(serverHeadProp) {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidServerHeadProp, serverHeadProp)
 	}
 
 	versionProvider := config.VersionProvider
@@ -94,5 +149,7 @@ func New(config Config) (*Renderer, error) {
 		renderOptions:        append([]RenderOption(nil), config.DefaultRenderOptions...),
 		componentTransformer: config.ComponentNameTransformer,
 		componentChecker:     config.ComponentExistenceChecker,
+		rootElementID:        rootElementID,
+		serverHeadProp:       serverHeadProp,
 	}, nil
 }

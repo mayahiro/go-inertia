@@ -78,6 +78,13 @@ func TestJSONResponseIncludesInertiaHeadersAndErrors(t *testing.T) {
 	if _, ok := page.Props["errors"]; !ok {
 		t.Fatalf("errors prop missing: %#v", page.Props)
 	}
+	var wire map[string]json.RawMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &wire); err != nil {
+		t.Fatal(err)
+	}
+	if version, ok := wire["version"]; !ok || string(version) != `""` {
+		t.Fatalf("empty asset version must remain in the page object: %s", w.Body.String())
+	}
 }
 
 func TestNewRequiresRootView(t *testing.T) {
@@ -319,7 +326,7 @@ func TestSharedAndHandlerPropsMerge(t *testing.T) {
 	if page.Props["message"] != "handler" {
 		t.Fatalf("handler prop did not override shared prop: %#v", page.Props)
 	}
-	if got := page.SharedProps; len(got) != 1 || got[0] != "app" {
+	if got := page.SharedProps; len(got) != 2 || got[0] != "app" || got[1] != "message" {
 		t.Fatalf("unexpected shared props metadata: %#v", got)
 	}
 	if _, ok := page.Props["errors"].(map[string]any); !ok {
@@ -392,7 +399,7 @@ func TestPropResolverAddsPageMetadata(t *testing.T) {
 	}
 }
 
-func TestPropResolverMetadataIsRemovedWhenPropIsOverridden(t *testing.T) {
+func TestOverriddenSharedPropIsNotResolved(t *testing.T) {
 	sharedItems := &testPropResolver{
 		result: propResult{
 			Value: []string{"shared"},
@@ -419,8 +426,8 @@ func TestPropResolverMetadataIsRemovedWhenPropIsOverridden(t *testing.T) {
 	}
 
 	page := decodePage(t, w)
-	if !sharedItems.called {
-		t.Fatal("expected shared prop resolver to be called")
+	if sharedItems.called {
+		t.Fatal("overridden shared prop resolver should not be called")
 	}
 	if page.Props["items"].([]any)[0] != "handler" {
 		t.Fatalf("handler prop should override shared prop: %#v", page.Props["items"])
@@ -1299,15 +1306,14 @@ func TestContextPropsFlashAndValidationErrorsMerge(t *testing.T) {
 	if page.Props["message"] != "handler" {
 		t.Fatalf("handler prop should override shared props: %#v", page.Props)
 	}
-	if got := page.SharedProps; len(got) != 2 || got[0] != "contextShared" || got[1] != "global" {
+	if got := page.SharedProps; len(got) != 3 || got[0] != "contextShared" || got[1] != "global" || got[2] != "message" {
 		t.Fatalf("unexpected shared props metadata: %#v", got)
 	}
 	if page.Props["contextProp"] != "prop" {
 		t.Fatalf("missing context prop: %#v", page.Props)
 	}
-	flash, ok := page.Props["flash"].(map[string]any)
-	if !ok || flash["notice"] != "saved" {
-		t.Fatalf("unexpected flash: %#v", page.Props["flash"])
+	if page.Flash["notice"] != "saved" {
+		t.Fatalf("unexpected flash: %#v", page.Flash)
 	}
 	renderedErrors, ok := page.Props["errors"].(map[string]any)
 	if !ok || renderedErrors["title"] != "required" {
@@ -1331,9 +1337,8 @@ func TestFlashAndValidationErrorsMerge(t *testing.T) {
 	}
 
 	page := decodePage(t, w)
-	flash, ok := page.Props["flash"].(map[string]any)
-	if !ok || flash["success"] != "created" {
-		t.Fatalf("unexpected flash: %#v", page.Props["flash"])
+	if page.Flash["success"] != "created" {
+		t.Fatalf("unexpected flash: %#v", page.Flash)
 	}
 	errors, ok := page.Props["errors"].(map[string]any)
 	if !ok || errors["name"] != "required" {
@@ -1418,12 +1423,12 @@ func TestPartialReloadDataIncludesExistingFlash(t *testing.T) {
 	}
 
 	page := decodePage(t, w)
-	if _, ok := page.Props["flash"]; !ok {
-		t.Fatalf("flash should be included in partial reload: %#v", page.Props)
+	if page.Flash["success"] != "created" {
+		t.Fatalf("flash should be included in partial reload: %#v", page.Flash)
 	}
 }
 
-func TestPartialReloadExceptTakesPrecedenceOverData(t *testing.T) {
+func TestPartialReloadAppliesDataAndExceptTogether(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/users", nil)
 	req.Header.Set(HeaderInertia, "true")
@@ -1445,8 +1450,8 @@ func TestPartialReloadExceptTakesPrecedenceOverData(t *testing.T) {
 	if _, ok := page.Props["users"]; !ok {
 		t.Fatalf("users should be included: %#v", page.Props)
 	}
-	if _, ok := page.Props["stats"]; !ok {
-		t.Fatalf("stats should be included because except takes precedence: %#v", page.Props)
+	if _, ok := page.Props["stats"]; ok {
+		t.Fatalf("stats should be omitted because it is not in partial data: %#v", page.Props)
 	}
 	if _, ok := page.Props["filters"]; ok {
 		t.Fatalf("filters should be excluded: %#v", page.Props)
@@ -1638,7 +1643,7 @@ func TestAlwaysPropIsIncludedDuringPartialReloads(t *testing.T) {
 	}
 }
 
-func TestDeferredMergePropAddsMergeMetadataWhenLoaded(t *testing.T) {
+func TestDeferredMergePropPublishesMetadataBeforeLoad(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/users", nil)
 	req.Header.Set(HeaderInertia, "true")
@@ -1659,8 +1664,11 @@ func TestDeferredMergePropAddsMergeMetadataWhenLoaded(t *testing.T) {
 	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "results" {
 		t.Fatalf("unexpected deferred props: %#v", page.DeferredProps)
 	}
-	if len(page.DeepMergeProps) > 0 || len(page.MatchPropsOn) > 0 {
-		t.Fatalf("merge metadata should wait until the prop is loaded: %#v %#v", page.DeepMergeProps, page.MatchPropsOn)
+	if got := page.DeepMergeProps; len(got) != 1 || got[0] != "results" {
+		t.Fatalf("deferred merge metadata should be available initially: %#v", got)
+	}
+	if got := page.MatchPropsOn; len(got) != 1 || got[0] != "results.data.id" {
+		t.Fatalf("deferred match metadata should be available initially: %#v", got)
 	}
 
 	req = httptest.NewRequest("GET", "/users", nil)
@@ -1689,7 +1697,7 @@ func TestDeferredMergePropAddsMergeMetadataWhenLoaded(t *testing.T) {
 	}
 }
 
-func TestDeferredOncePropAddsOnceMetadataWhenLoaded(t *testing.T) {
+func TestDeferredOncePropPublishesMetadataBeforeLoad(t *testing.T) {
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/dashboard", nil)
 	req.Header.Set(HeaderInertia, "true")
@@ -1707,8 +1715,8 @@ func TestDeferredOncePropAddsOnceMetadataWhenLoaded(t *testing.T) {
 	if _, ok := page.Props["permissions"]; ok {
 		t.Fatalf("permissions should be deferred: %#v", page.Props)
 	}
-	if _, ok := page.OnceProps["permissions"]; ok {
-		t.Fatalf("once metadata should wait until the prop is loaded: %#v", page.OnceProps)
+	if got := page.OnceProps["permissions"]; got.Prop != "permissions" {
+		t.Fatalf("deferred once metadata should be available initially: %#v", page.OnceProps)
 	}
 
 	req = httptest.NewRequest("GET", "/dashboard", nil)
@@ -1734,7 +1742,7 @@ func TestDeferredOncePropAddsOnceMetadataWhenLoaded(t *testing.T) {
 	}
 }
 
-func TestDeferredScrollPropAddsScrollMetadataWhenLoaded(t *testing.T) {
+func TestDeferredScrollPropPublishesMergeMetadataBeforeLoad(t *testing.T) {
 	calls := 0
 	renderer := newTestRenderer(t, Config{})
 	req := httptest.NewRequest("GET", "/posts", nil)
@@ -1760,8 +1768,11 @@ func TestDeferredScrollPropAddsScrollMetadataWhenLoaded(t *testing.T) {
 	if got := page.DeferredProps["default"]; len(got) != 1 || got[0] != "posts" {
 		t.Fatalf("unexpected deferred props: %#v", page.DeferredProps)
 	}
-	if len(page.ScrollProps) > 0 || len(page.MergeProps) > 0 {
-		t.Fatalf("scroll metadata should wait until the prop is loaded: %#v %#v", page.ScrollProps, page.MergeProps)
+	if len(page.ScrollProps) > 0 {
+		t.Fatalf("pagination metadata should wait until the prop is loaded: %#v", page.ScrollProps)
+	}
+	if got := page.MergeProps; len(got) != 1 || got[0] != "posts.data" {
+		t.Fatalf("deferred scroll merge metadata should be available initially: %#v", got)
 	}
 
 	req = httptest.NewRequest("GET", "/posts", nil)
@@ -1918,7 +1929,7 @@ type testPropResolver struct {
 	called bool
 }
 
-func (r *testPropResolver) resolveProp(req *http.Request, component string, key string) (propResult, error) {
+func (r *testPropResolver) resolveProp(context propResolutionContext) (propResult, error) {
 	r.called = true
 	return r.result, r.err
 }
