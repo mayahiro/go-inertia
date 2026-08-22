@@ -46,7 +46,7 @@ it succeeds. Open `/?failServerTime=1` to exercise the rescue state.
 Visit an undefined path to see the mapped 404 page, or `/demo/error` to exercise
 the default 500 page. Both receive structured server-provided head elements.
 
-The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.6.1. The example
+The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.7.0. The example
 uses client-side rendering and does not configure Inertia SSR.
 
 The Go module declares `v0.4.0` for `go-inertia` and the Echo adapter. Local
