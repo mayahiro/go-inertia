@@ -62,6 +62,7 @@ type Renderer struct {
 	componentChecker     ComponentExistenceChecker
 	rootElementID        string
 	serverHeadProp       string
+	devTools             *devToolsRecorder
 }
 
 // Config configures a Renderer.
@@ -90,6 +91,8 @@ type Config struct {
 	// ServerHeadProp is the page prop read by the client serverHead option.
 	// The default is "head".
 	ServerHeadProp string
+	// DevTools configures the local Inertia DevTools protocol recorder.
+	DevTools DevToolsConfig
 }
 
 // New creates a Renderer from config.
@@ -151,5 +154,6 @@ func New(config Config) (*Renderer, error) {
 		componentChecker:     config.ComponentExistenceChecker,
 		rootElementID:        rootElementID,
 		serverHeadProp:       serverHeadProp,
+		devTools:             newDevToolsRecorder(config.DevTools),
 	}, nil
 }

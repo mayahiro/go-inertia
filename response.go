@@ -27,6 +27,7 @@ func (StandardJSONEncoder) Encode(v any) ([]byte, error) {
 // For Inertia requests it writes a JSON page response.
 // For normal browser visits it renders the configured RootView.
 func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component string, props Props, opts ...RenderOption) error {
+	r.recordDevToolsRenderCaller(req, 1)
 	component, err := r.prepareComponent(component)
 	if err != nil {
 		return err
@@ -81,14 +82,16 @@ func (r *Renderer) Render(w http.ResponseWriter, req *http.Request, component st
 	}); err != nil {
 		return err
 	}
+	renderedBody := injectDevToolsIDScript(body.Bytes(), devToolsIDScript(req))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(statusCode)
-	_, err = w.Write(body.Bytes())
+	_, err = w.Write(renderedBody)
 	return err
 }
 
 // RenderError renders an Inertia error page with status.
 func (r *Renderer) RenderError(w http.ResponseWriter, req *http.Request, component string, props Props, status int, opts ...RenderOption) error {
+	r.recordDevToolsRenderCaller(req, 1)
 	renderOpts := make([]RenderOption, 0, len(opts)+1)
 	renderOpts = append(renderOpts, WithRenderStatus(status))
 	renderOpts = append(renderOpts, opts...)

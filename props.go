@@ -108,6 +108,7 @@ func (r *Renderer) page(req *http.Request, component string, props Props, opts r
 		Flash:            pageFlash,
 	}
 	merged.Metadata.applyTo(&page)
+	r.recordDevToolsPage(req, page, resolvedSources, merged.SharedProps)
 	return page, nil
 }
 
