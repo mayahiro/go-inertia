@@ -1,9 +1,18 @@
 package inertiaecho
 
 import (
+	"net/http"
+	"runtime"
+
 	echo "github.com/labstack/echo/v5"
 	inertia "github.com/mayahiro/go-inertia"
 )
+
+type devToolsRenderSourceRecorder interface {
+	RecordDevToolsRenderSource(req *http.Request, file string, line int)
+}
+
+const devToolsIDHeader = "X-Inertia-Devtools-Id"
 
 // Adapter connects an inertia.Renderer to Echo v5 handlers.
 type Adapter struct {
@@ -18,11 +27,13 @@ func New(renderer *inertia.Renderer) *Adapter {
 
 // Render renders an Inertia page through Echo.
 func (a *Adapter) Render(c *echo.Context, component string, props inertia.Props, opts ...inertia.RenderOption) error {
+	a.recordDevToolsRenderSource(c)
 	return a.Renderer.Render(c.Response(), c.Request(), component, props, opts...)
 }
 
 // RenderError renders an Inertia error page with status through Echo.
 func (a *Adapter) RenderError(c *echo.Context, component string, props inertia.Props, status int, opts ...inertia.RenderOption) error {
+	a.recordDevToolsRenderSource(c)
 	return a.Renderer.RenderError(c.Response(), c.Request(), component, props, status, opts...)
 }
 
@@ -39,4 +50,19 @@ func (a *Adapter) Back(c *echo.Context, opts ...inertia.RedirectOption) error {
 // Location sends an Inertia location response through Echo.
 func (a *Adapter) Location(c *echo.Context, url string) error {
 	return a.Renderer.Location(c.Response(), c.Request(), url)
+}
+
+func (a *Adapter) recordDevToolsRenderSource(c *echo.Context) {
+	if c.Response().Header().Get(devToolsIDHeader) == "" {
+		return
+	}
+	recorder, ok := any(a.Renderer).(devToolsRenderSourceRecorder)
+	if !ok {
+		return
+	}
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		return
+	}
+	recorder.RecordDevToolsRenderSource(c.Request(), file, line)
 }
