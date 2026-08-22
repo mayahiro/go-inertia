@@ -26,6 +26,7 @@ It demonstrates:
 - a custom root element id shared by the Go renderer and React client
 - React automatic bootstrap with StrictMode
 - centralized 404 and 500 pages through the Echo adapter error handler
+- Inertia DevTools discovery and request inspection in development
 
 The Users page intentionally sends `reset: ["users"]` after a successful create
 so the infinite scroll list is rebuilt and the newly created user appears on
@@ -49,7 +50,7 @@ the default 500 page. Both receive structured server-provided head elements.
 The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.7.0. The example
 uses client-side rendering and does not configure Inertia SSR.
 
-The Go module declares `v0.4.0` for `go-inertia` and the Echo adapter. Local
+The Go module declares `v0.5.0` for `go-inertia` and the Echo adapter. Local
 `replace` directives make the example run against this checkout instead of a
 published module tag.
 
@@ -73,18 +74,26 @@ Start the Vite dev server:
 npm run dev
 ```
 
-In another terminal, start the Go server and point it at the Vite dev server:
+In another terminal, start the Go server, enable the backend DevTools recorder,
+and point it at the Vite dev server:
 
 ```sh
-VITE_DEV_SERVER=http://127.0.0.1:5173 go run .
+INERTIA_DEVTOOLS_ENABLED=true VITE_DEV_SERVER=http://127.0.0.1:5173 go run .
 ```
 
 Open `http://localhost:8080`.
 
+The React client passes `dev: import.meta.env.DEV` to `createInertiaApp`, while
+`INERTIA_DEVTOOLS_ENABLED=true` enables the matching server protocol. Install
+the Inertia DevTools browser extension to inspect visits, props, route metadata,
+and render source locations. The recorder keeps entries in process memory and,
+by default, only records and serves entries for direct loopback requests. Keep
+it disabled outside a trusted local development environment.
+
 If port `8080` is already in use, set `PORT`:
 
 ```sh
-PORT=8081 VITE_DEV_SERVER=http://127.0.0.1:5173 go run .
+PORT=8081 INERTIA_DEVTOOLS_ENABLED=true VITE_DEV_SERVER=http://127.0.0.1:5173 go run .
 ```
 
 ## Production Build

@@ -5,6 +5,7 @@ import './style.css'
 
 createInertiaApp<ExamplePageProps>({
   id: 'inertia-app',
+  dev: import.meta.env.DEV,
   serverHead: true,
   strictMode: true,
   resolve: name => {

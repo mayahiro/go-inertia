@@ -1,12 +1,16 @@
 package main
 
 import (
+	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	echo "github.com/labstack/echo/v5"
+	inertia "github.com/mayahiro/go-inertia"
+	inertiaecho "github.com/mayahiro/go-inertia/adapters/echo"
 )
 
 func TestBindCreateUserAcceptsJSON(t *testing.T) {
@@ -71,6 +75,98 @@ func TestLoadServerTimeCanDemonstrateRescue(t *testing.T) {
 
 	if _, err := loadServerTime(req); err == nil {
 		t.Fatal("expected demonstration deferred prop failure")
+	}
+}
+
+func TestDevToolsEnabled(t *testing.T) {
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{value: "true", want: true},
+		{value: " TRUE ", want: true},
+		{value: "1", want: true},
+		{value: "false", want: false},
+		{value: "", want: false},
+		{value: "invalid", want: false},
+	}
+
+	for _, test := range tests {
+		if got := devToolsEnabled(test.value); got != test.want {
+			t.Fatalf("devToolsEnabled(%q) = %t, want %t", test.value, got, test.want)
+		}
+	}
+}
+
+func TestEchoDevToolsMetadata(t *testing.T) {
+	view := template.Must(template.New("app").Parse(`<!doctype html><html><body>{{ .InertiaApp }}</body></html>`))
+	renderer, err := inertia.New(inertia.Config{
+		RootView: inertia.NewTemplateRootView(view, "app"),
+		DevTools: inertia.DevToolsConfig{
+			Enabled: true,
+			ComponentPathResolver: func(component string) string {
+				return "resources/js/Pages/" + component + ".tsx"
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := inertiaecho.New(renderer)
+	e := echo.New()
+	e.Use(app.Middleware)
+	e.GET("/users/:id", func(c *echo.Context) error {
+		return app.Render(c, "Users/Show", inertia.Props{"id": c.Param("id")})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	w := httptest.NewRecorder()
+	e.ServeHTTP(w, req)
+	if got := w.Code; got != http.StatusOK {
+		t.Fatalf("unexpected application status %d: %s", got, w.Body.String())
+	}
+	id := w.Header().Get(inertia.HeaderInertiaDevToolsID)
+	if id == "" {
+		t.Fatal("missing DevTools entry id")
+	}
+
+	entryRequest := httptest.NewRequest(http.MethodGet, "/_inertia/devtools/entries/"+id, nil)
+	entryRequest.RemoteAddr = "127.0.0.1:12345"
+	entryResponse := httptest.NewRecorder()
+	e.ServeHTTP(entryResponse, entryRequest)
+	if got := entryResponse.Code; got != http.StatusOK {
+		t.Fatalf("unexpected entry status %d: %s", got, entryResponse.Body.String())
+	}
+	var entry struct {
+		Meta struct {
+			Component *string `json:"component"`
+		} `json:"__meta"`
+		Route struct {
+			Name *string `json:"name"`
+			URI  string  `json:"uri"`
+		} `json:"route"`
+		RenderSource *struct {
+			File string `json:"file"`
+			Line int    `json:"line"`
+		} `json:"renderSource"`
+		ComponentPath *string `json:"componentPath"`
+	}
+	if err := json.Unmarshal(entryResponse.Body.Bytes(), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if entry.Meta.Component == nil || *entry.Meta.Component != "Users/Show" {
+		t.Fatalf("unexpected component %#v", entry.Meta.Component)
+	}
+	if entry.Route.Name != nil || entry.Route.URI != "/users/:id" {
+		t.Fatalf("unexpected Echo route metadata %#v", entry.Route)
+	}
+	if entry.RenderSource == nil || !strings.HasSuffix(entry.RenderSource.File, "main_test.go") || entry.RenderSource.Line < 1 {
+		t.Fatalf("unexpected render source %#v", entry.RenderSource)
+	}
+	if entry.ComponentPath == nil || *entry.ComponentPath != "resources/js/Pages/Users/Show.tsx" {
+		t.Fatalf("unexpected component path %#v", entry.ComponentPath)
 	}
 }
 

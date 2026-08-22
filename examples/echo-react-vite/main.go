@@ -114,6 +114,12 @@ func main() {
 		RootElementID:   "inertia-app",
 		VersionProvider: vite.VersionProvider(),
 		FlashStore:      inertia.NewMemoryFlashStore(),
+		DevTools: inertia.DevToolsConfig{
+			Enabled: devToolsEnabled(os.Getenv("INERTIA_DEVTOOLS_ENABLED")),
+			ComponentPathResolver: func(component string) string {
+				return "resources/js/Pages/" + component + ".tsx"
+			},
+		},
 		SharedProps: inertia.SharedPropsFunc(func(req *http.Request) (inertia.Props, error) {
 			return inertia.Props{
 				"app": inertia.Always(appProps{Name: "Go Inertia Admin"}),
@@ -305,6 +311,11 @@ func serverAddress() string {
 		port = "8080"
 	}
 	return ":" + port
+}
+
+func devToolsEnabled(value string) bool {
+	enabled, err := strconv.ParseBool(strings.TrimSpace(value))
+	return err == nil && enabled
 }
 
 func requiredErrors(name string, email string) inertia.ValidationErrors {
