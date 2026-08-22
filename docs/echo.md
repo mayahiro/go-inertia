@@ -1,5 +1,7 @@
 # Echo Adapter
 
+[日本語](echo_ja.md)
+
 The Echo v5 adapter lives in a separate module:
 
 ```txt
@@ -12,7 +14,7 @@ The core package does not import Echo.
 
 - Go 1.25.0 or newer
 - Echo v5.3.1 or newer
-- go-inertia v0.4.0
+- go-inertia v0.5.0
 
 ## Installation
 
