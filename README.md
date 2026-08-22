@@ -65,6 +65,7 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - Precognition request and response helpers
 - history encryption and clear-history flags
 - prefetch request detection
+- backend-independent Inertia DevTools recording and read endpoints
 - Vite manifest, imported chunk, and dev-server tag generation
 - default render options
 - structured server-provided head elements
@@ -80,6 +81,29 @@ go get github.com/mayahiro/go-inertia/adapters/echo
 - For larger pages, define page-specific Go structs and convert them to `inertia.Props` at the render boundary. This keeps the server/frontend contract easier to review.
 - `NewMemoryFlashStore` is intended for local development, tests, and single-process examples. Production and clustered applications can connect an existing durable session through `NewSessionFlashStore`, or implement `FlashStore` directly for a shared backend.
 - `go build` builds Go code only. Templates and Vite assets are deployed as files unless your application embeds them.
+
+## DevTools
+
+Enable the local recorder through `Config.DevTools` and enable the matching
+client hooks through `createInertiaApp({ dev: import.meta.env.DEV })`. The
+recorder is disabled by default, uses an in-memory store, redacts common secret
+keys and headers, and accepts only direct loopback requests unless an explicit
+`Authorize` callback is configured.
+
+```go
+renderer, err := inertia.New(inertia.Config{
+	RootView: rootView,
+	DevTools: inertia.DevToolsConfig{
+		Enabled: os.Getenv("INERTIA_DEVTOOLS_ENABLED") == "true",
+		ComponentPathResolver: func(component string) string {
+			return "resources/js/Pages/" + component + ".tsx"
+		},
+	},
+})
+```
+
+See [DevTools](docs/devtools.md) for setup, security boundaries, storage limits,
+and framework metadata hooks.
 
 ## Core Example
 
@@ -507,6 +531,7 @@ React + Vite + Echo example.
 - [Merge props](docs/merge-props.md)
 - [Infinite scroll](docs/infinite-scroll.md)
 - [Testing](docs/testing.md)
+- [DevTools](docs/devtools.md)
 
 ## Not Yet Covered by Public Helpers
 
