@@ -60,7 +60,9 @@ func Lazy(fn PropFunc) Prop {
 	return Computed(fn)
 }
 
-// Optional returns a prop that is only included when explicitly requested.
+// Optional returns a prop omitted from full visits and selected by the only and
+// except filters of a partial reload for the same component. An except-only
+// reload includes the prop unless it is excluded.
 func Optional(value any) Prop {
 	return newProp(value).Optional()
 }
@@ -91,7 +93,9 @@ func isPropFunc(value any) bool {
 	}
 }
 
-// Optional returns p configured to be included only when explicitly requested.
+// Optional returns p configured to be omitted from full visits and selected by
+// the only and except filters of a partial reload for the same component.
+// An except-only reload includes the prop unless it is excluded.
 func (p Prop) Optional() Prop {
 	p.mode = propModeOptional
 	return p

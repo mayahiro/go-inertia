@@ -1,5 +1,7 @@
 # Partial Reloads and Computed Props
 
+[日本語](partial-reloads_ja.md)
+
 Partial reloads let the Inertia client request a subset of props for the same
 page component. `go-inertia` reads the standard Inertia headers and filters
 nested prop paths recursively.
@@ -9,6 +11,8 @@ nested prop paths recursively.
 - `X-Inertia-Partial-Component` must match the rendered component.
 - `X-Inertia-Partial-Data` lists props to include.
 - `X-Inertia-Partial-Except` lists props and descendants to exclude.
+- An `except`-only partial reload includes all eligible props that are not
+  excluded, including optional and deferred props.
 - When both filters are present, included paths must satisfy `Partial-Data` and
   must not match `Partial-Except`.
 - `X-Inertia-Reset` lists merge or scroll props that should replace existing
@@ -49,7 +53,8 @@ the sparse sequence is encoded as a JSON object with numeric keys.
 
 Use `inertia.Props`, string-key maps, slices, or arrays when nested values need
 prop modifiers. Structs and custom `json.Marshaler` values remain terminal JSON
-values.
+values: they can contain ordinary JSON data, but `go-inertia` does not resolve
+prop modifiers inside them or filter their fields individually.
 
 ## Computed Props
 
@@ -75,19 +80,32 @@ Use `Computed` when an explicit wrapper reads better.
 ```
 
 `Lazy` is a deprecated alias for `Computed`. It is not the removed Inertia v3
-`LazyProp`. Use `Optional` for the official request-only behavior.
+`LazyProp`. Use `Optional` for props returned when selected by a partial reload.
 
 ## Optional Props
 
-Use `Optional` for props that should never be included unless the client
-explicitly asks for them with `only`.
+Use `Optional` for props that should be omitted from full visits and resolved
+when selected by a partial reload for the same component.
 
 ```go
 "companies": inertia.Optional(loadCompanies)
 ```
 
-This is useful for secondary datasets that should not be loaded on the first
-visit.
+For an optional `companies` prop alongside a regular `users` prop:
+
+| Visit | Is `companies` resolved? |
+| --- | --- |
+| Full visit | No |
+| `only: ['companies']` | Yes |
+| `only: ['users']` | No |
+| `except: ['users']` | Yes |
+| `except: ['companies']` | No |
+| `only: ['companies'], except: ['companies']` | No |
+
+The partial reload rows assume the component matches and neither prop has
+additional modifiers. The `except` option can therefore load optional data
+that has not been requested before. Use `only` to select a specific set of
+optional props.
 
 ## Always Props
 
@@ -124,3 +142,8 @@ arguments passed to single-value variadic modifiers.
 
 Validation also covers unrequested props so a configuration error does not stay
 hidden until a later partial reload.
+
+## Reference
+
+See the [Inertia protocol](https://inertiajs.com/docs/v3/core-concepts/the-protocol)
+for the server-side prop evaluation rules.
