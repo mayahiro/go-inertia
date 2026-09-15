@@ -1,5 +1,7 @@
 # go-inertia
 
+[日本語](README_ja.md)
+
 A small server-side Inertia.js adapter for Go.
 
 The core package is built on `net/http` and has no runtime dependencies outside
@@ -336,11 +338,14 @@ Use `Computed` when an explicit wrapper is clearer.
 ```
 
 `Lazy` remains as a deprecated alias for `Computed`. It is not the removed
-Inertia v3 `LazyProp`; use `Optional` for props that are only returned when
-explicitly requested.
+Inertia v3 `LazyProp`; use `Optional` for props that are returned when selected
+by a partial reload.
 
-Use `Optional` for props that should only be sent when explicitly requested with
-the client `only` option.
+Use `Optional` for props that should be omitted from full visits and resolved
+when selected by a partial reload for the same component. The client `only`
+option selects named props; an `except`-only reload includes optional props
+that are not excluded. When both filters are present, a prop must satisfy
+`only` and not match `except`.
 
 ```go
 "companies": inertia.Optional(loadCompanies)

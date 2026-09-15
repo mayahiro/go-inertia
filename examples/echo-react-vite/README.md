@@ -34,6 +34,12 @@ the first page. In a production page where a form sits beside a long loaded
 list, omit that `reset` option when the existing scroll state should remain in
 place, or update the current list with Inertia client-side prop helpers.
 
+The success banner reads `page.flash` directly. After the list is reset,
+`InfiniteScroll` can immediately trigger another partial reload, clearing the
+flash data and making the banner short-lived. For a persistent notification,
+handle Inertia's [flash event or `onFlash` callback](https://inertiajs.com/docs/v3/data-props/flash-data)
+and keep the notification in application UI state.
+
 `NewMemoryFlashStore` is intended for local development and single-process
 examples. Production or clustered applications can adapt an existing durable
 session through `NewSessionFlashStore`, or implement `FlashStore` directly for
@@ -47,8 +53,9 @@ it succeeds. Open `/?failServerTime=1` to exercise the rescue state.
 Visit an undefined path to see the mapped 404 page, or `/demo/error` to exercise
 the default 500 page. Both receive structured server-provided head elements.
 
-The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.7.0. The example
-uses client-side rendering and does not configure Inertia SSR.
+The frontend pins `@inertiajs/core` and `@inertiajs/react` to 3.7.1 and uses
+React 19.3.0, TypeScript 7.0.2, and Vite 8.3.0. The example uses client-side
+rendering and does not configure Inertia SSR.
 
 The Go module declares `v0.5.0` for `go-inertia` and the Echo adapter. Local
 `replace` directives make the example run against this checkout instead of a
@@ -61,6 +68,10 @@ published module tag.
 - npm
 
 ## Development
+
+Run the commands in this README from `examples/echo-react-vite`.
+The frontend uses npm and the committed `package-lock.json` for reproducible
+dependency installation.
 
 Install frontend dependencies:
 

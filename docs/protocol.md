@@ -1,5 +1,7 @@
 # Protocol
 
+[日本語](protocol_ja.md)
+
 `go-inertia` implements the server-side pieces needed for the basic Inertia
 protocol: HTML first visits, JSON Inertia visits, asset version mismatches,
 redirects, server-side shared prop merging, flash data, validation errors,
@@ -77,12 +79,12 @@ persisting flash data as an ordinary history prop.
 
 ## Asset Version Mismatches
 
-For GET Inertia requests, middleware compares `X-Inertia-Version` with the
-current asset version. If they differ, it returns `409 Conflict`, sets
-`X-Inertia-Location` to the current URL, and sets `X-Inertia-Version` to the
-current version. The response version lets Inertia v3.6 and later distinguish
-an asset version change from an explicit location response and defer a hard
-reload triggered by a background request.
+When a non-empty asset version is configured, middleware compares it with
+`X-Inertia-Version` on GET Inertia requests. If they differ, it returns
+`409 Conflict`, sets `X-Inertia-Location` to the current URL, and sets
+`X-Inertia-Version` to the current version. The response version lets Inertia
+v3.6 and later distinguish an asset version change from an explicit location
+response and defer a hard reload triggered by a background request.
 
 Non-GET requests do not return an asset mismatch response directly.
 
@@ -104,6 +106,8 @@ full dot-notation metadata paths such as `auth.notifications`.
 - Filtering applies only when `X-Inertia-Partial-Component` matches the rendered component.
 - `X-Inertia-Partial-Data` includes matching paths and their required ancestors.
 - `X-Inertia-Partial-Except` removes matching paths and descendants.
+- When only `Partial-Except` is present, eligible props that are not excluded
+  are resolved, including optional and deferred props.
 - When both headers are present, a path must satisfy `Partial-Data` and must not match `Partial-Except`.
 - `X-Inertia-Reset` removes merge metadata for listed prop paths.
   For infinite scroll props, the matching `scrollProps` entry remains and is
@@ -112,8 +116,9 @@ full dot-notation metadata paths such as `auth.notifications`.
 - top-level `flash` is included when flash data exists and is independent of prop filtering.
 
 Plain `func(*http.Request) (any, error)` props are computed when included.
-`Optional` props are only included when explicitly requested with
-`Partial-Data`. `Always` props are included even during partial reloads.
+`Optional` props are omitted from full visits and resolved when selected by a
+matching partial reload's `Partial-Data` and `Partial-Except` filters.
+`Always` props are included even when the filters would exclude them.
 
 Top-level dot-notation input keys are unpacked before recursive resolution.
 
@@ -126,6 +131,10 @@ inertia.Props{
 
 When a callback returns a map, slice, or array, its returned children are
 resolved as part of that callback value and bypass a second partial filter.
+
+Structs and custom `json.Marshaler` values are terminal JSON values. Nested
+modifiers and filtering individual fields require maps, slices, or arrays.
+See [Partial reloads](partial-reloads.md) for the supported shapes and examples.
 
 ## Server-Provided Head
 
@@ -189,7 +198,8 @@ the once key. The client reports loaded once keys with
   "version": "",
   "onceProps": {
     "plans": {
-      "prop": "plans"
+      "prop": "plans",
+      "expiresAt": null
     }
   }
 }
